@@ -49,7 +49,7 @@ final class Settings_Repository {
 		'ai.profile.copy.max_tokens'       => 6000,
 		'ai.profile.perception.model'      => 'google/gemini-2.5-flash',
 		'ai.profile.perception.temperature' => 0.1,
-		'ai.profile.perception.max_tokens' => 8000,
+		'ai.profile.perception.max_tokens' => 32000,
 		'onboarding.max_pages_per_site'    => 50,
 		'onboarding.max_pages_per_run'     => 100,
 		'onboarding.max_input_chars'       => 250000,

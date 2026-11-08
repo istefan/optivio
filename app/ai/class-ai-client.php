@@ -162,11 +162,46 @@ final class Ai_Client {
 		);
 
 		[ $code, $response, $error ] = self::is_mock() ? Ai_Mock::respond( $purpose, $user ) : self::send( (string) $key, $body );
-		$content = (string) ( $response['choices'][0]['message']['content'] ?? '' );
-		$usage   = (array) ( $response['usage'] ?? array() );
-		$data    = self::decode_json( $content );
+		$content  = (string) ( $response['choices'][0]['message']['content'] ?? '' );
+		$usage    = (array) ( $response['usage'] ?? array() );
+		$finish   = (string) ( $response['choices'][0]['finish_reason'] ?? $response['choices'][0]['native_finish_reason'] ?? '' );
+		$data     = self::decode_json( $content );
+		$repaired = false;
+		if ( null === $data && 200 === $code && '' !== trim( $content ) ) {
+			// Output cut at the token limit: keep every complete value (the rest is dropped).
+			$data     = self::repair_json( $content );
+			$repaired = null !== $data;
+		}
 		$ok      = 200 === $code && null !== $data;
-		$message = $ok ? null : mb_substr( (string) ( $response['error']['message'] ?? $error ?: ( 200 === $code ? 'Răspuns AI în format invalid (JSON așteptat).' : 'HTTP ' . $code ) ), 0, 500 );
+		$invalid = 'Răspuns AI în format invalid (JSON așteptat).';
+		if ( in_array( strtolower( $finish ), array( 'length', 'max_tokens' ), true ) ) {
+			$invalid = sprintf( 'Răspunsul AI a fost trunchiat la limita de %d tokeni de ieșire a profilului „%s”. Măriți „Max tokens” în Setări → AI sau trimiteți mai puține pagini.', (int) $config['max_tokens'], $profile );
+		} elseif ( '' === trim( $content ) ) {
+			$invalid = 'Modelul nu a returnat niciun text (posibil filtrat sau limită de tokeni consumată de raționament). Reîncercați sau măriți „Max tokens”.';
+		}
+		$message = $ok ? null : mb_substr( (string) ( $response['error']['message'] ?? $error ?: ( 200 === $code ? $invalid : 'HTTP ' . $code ) ), 0, 500 );
+		if ( ! $ok && 200 === $code ) {
+			\OptiVio\Core\Logger::error(
+				'AI answer not usable',
+				array(
+					'purpose' => $purpose,
+					'model'   => $config['model'],
+					'finish'  => $finish,
+					'chars'   => strlen( $content ),
+					'head'    => mb_substr( $content, 0, 300 ),
+					'tail'    => mb_substr( $content, -300 ),
+				)
+			);
+		} elseif ( $repaired ) {
+			\OptiVio\Core\Logger::info(
+				'AI answer repaired (truncated JSON)',
+				array(
+					'purpose' => $purpose,
+					'finish'  => $finish,
+					'chars'   => strlen( $content ),
+				)
+			);
+		}
 
 		$db->update(
 			'ai_requests',
@@ -187,6 +222,7 @@ final class Ai_Client {
 			'request_id' => $rid,
 			'data'       => $data,
 			'raw'        => $content,
+			'truncated'  => $repaired,
 		);
 	}
 
@@ -238,5 +274,56 @@ final class Ai_Client {
 			$data = json_decode( $m[0], true );
 		}
 		return is_array( $data ) ? $data : null;
+	}
+
+	/**
+	 * Repairs a JSON object cut in the middle (token limit): keeps everything up to the last
+	 * complete value and closes the open arrays / objects. Returns null when nothing usable remains.
+	 *
+	 * @param string $content Raw content.
+	 * @return array|null
+	 */
+	public static function repair_json( string $content ): ?array {
+		$content = (string) preg_replace( '/^\s*```(?:json)?\s*/i', '', $content );
+		$start   = strpos( $content, '{' );
+		if ( false === $start ) {
+			return null;
+		}
+		$json   = substr( $content, $start );
+		$len    = strlen( $json );
+		$stack  = array();
+		$in_str = false;
+		$cuts   = array();
+		for ( $i = 0; $i < $len; $i++ ) {
+			$c = $json[ $i ];
+			if ( $in_str ) {
+				if ( '\\' === $c ) {
+					++$i;
+				} elseif ( '"' === $c ) {
+					$in_str = false;
+				}
+				continue;
+			}
+			if ( '"' === $c ) {
+				$in_str = true;
+			} elseif ( '{' === $c || '[' === $c ) {
+				$stack[] = '{' === $c ? '}' : ']';
+			} elseif ( '}' === $c || ']' === $c ) {
+				array_pop( $stack );
+				// A closed container is a complete value: cutting right after it is safe.
+				$cuts[] = array( $i + 1, $stack );
+			} elseif ( ',' === $c ) {
+				$cuts[] = array( $i, $stack );
+			}
+		}
+		// Try the longest prefixes first (max. 300 attempts).
+		foreach ( array_slice( array_reverse( $cuts ), 0, 300 ) as [ $pos, $open ] ) {
+			$candidate = rtrim( substr( $json, 0, $pos ), " \t\r\n," ) . implode( '', array_reverse( $open ) );
+			$data      = json_decode( $candidate, true );
+			if ( is_array( $data ) && ! empty( $data ) ) {
+				return $data;
+			}
+		}
+		return null;
 	}
 }

@@ -26,6 +26,11 @@ defined( 'OPTIVIO_ROOT' ) || exit;
 final class Ai_Config {
 
 	/**
+	 * Minimum output tokens of the perception profile.
+	 */
+	public const PERCEPTION_MIN_TOKENS = 16000;
+
+	/**
 	 * Effective configuration of every profile for a business (or global when 0).
 	 *
 	 * @param int $business_id Business id (0 = global only).
@@ -49,6 +54,9 @@ final class Ai_Config {
 				'key_source'   => $key_source,
 			);
 		}
+		// The perception answer describes up to 100 pages; thinking models (e.g. Gemini 2.5) also
+		// spend output tokens on reasoning: below this limit the JSON gets cut.
+		$result['perception']['max_tokens'] = max( self::PERCEPTION_MIN_TOKENS, (int) $result['perception']['max_tokens'] );
 		return $result;
 	}
 }

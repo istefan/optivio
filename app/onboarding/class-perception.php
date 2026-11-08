@@ -327,6 +327,7 @@ final class Perception {
 		$urls   = array_column( $input['pages'], 'url' );
 		$result = self::validate( (array) $res['data'], $urls );
 		$result['deterministic'] = $input['facts'];
+		$result['output_truncated'] = ! empty( $res['truncated'] );
 
 		return Database::instance()->insert(
 			'business_perceptions',

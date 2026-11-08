@@ -40,6 +40,9 @@ $ov_src   = array(
 					</div>
 				</div>
 				<p class="mb-3"><?php echo esc_html( (string) ( $ov_per['result']['summary'] ?? '' ) ); ?></p>
+				<?php if ( ! empty( $ov_per['result']['output_truncated'] ) ) : ?>
+					<div class="ov-alert ov-alert-warning"><i class="bi bi-scissors" aria-hidden="true"></i><div>Răspunsul AI a atins limita de tokeni și a fost recuperat parțial (ultimele pagini din „per_page” pot lipsi). Pentru un rezultat complet, măriți „Max tokens” al profilului Percepție sau trimiteți mai puține pagini.</div></div>
+				<?php endif; ?>
 				<a class="btn btn-dark" href="<?php echo esc_url( ov_url( '/onboarding/' . $ov_id . '/confirm' ) ); ?>">Confirmă profilul <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></a>
 			</div>
 		<?php endif; ?>
@@ -56,7 +59,7 @@ $ov_src   = array(
 				<dt>Pagini trimise</dt><dd><?php echo esc_html( (string) count( $ov_in['pages'] ) ); ?><?php echo $ov_trunc > 0 ? esc_html( sprintf( ' (%d trunchiate ca să încapă în limită)', $ov_trunc ) ) : ''; ?></dd>
 				<dt>Text trimis</dt><dd><?php echo esc_html( ov_number( (int) $ov_in['chars'] ) ); ?> caractere<?php echo (int) $ov_in['common_chars'] > 0 ? esc_html( sprintf( ' (header/footer comun: %s, trimis o singură dată)', ov_number( (int) $ov_in['common_chars'] ) ) ) : ''; ?></dd>
 				<dt>Model</dt><dd><span class="ov-kbd"><?php echo esc_html( (string) $ov_pre['model'] ); ?></span> · <?php echo esc_html( $ov_src[ $ov_pre['key_source'] ] ?? $ov_pre['key_source'] ); ?></dd>
-				<dt>Cost estimat</dt><dd><?php echo null !== $ov_pre['estimate'] ? esc_html( '~' . number_format( (float) $ov_pre['estimate'], 4 ) . ' USD' ) : 'necunoscut (prețul modelului nu a putut fi citit)'; ?></dd>
+				<dt>Cost maxim estimat</dt><dd><?php echo null !== $ov_pre['estimate'] ? esc_html( '~' . number_format( (float) $ov_pre['estimate'], 4 ) . ' USD' ) : 'necunoscut (prețul modelului nu a putut fi citit)'; ?></dd>
 				<dt>Buget lunar</dt><dd><?php echo esc_html( number_format( (float) $ov_pre['spent'], 2 ) . ' / ' . number_format( (float) $ov_pre['budget'], 2 ) . ' USD' ); ?></dd>
 			</dl>
 			<?php if ( $ov_pre['blocked'] ) : ?>

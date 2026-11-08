@@ -52,7 +52,7 @@ final class Settings_Controller extends Controller {
 		'fast'      => array( 'Model Rapid / Audit', 'Clasificări, rezumate și verificări rapide.' ),
 		'reasoning' => array( 'Model Raționament / Strategie', 'Analiza profundă multi-sursă și strategia Ads/SEO.' ),
 		'copy'      => array( 'Model Copywriting / Conținut', 'Titluri, meta descrieri, articole și landing page-uri.' ),
-		'perception' => array( 'Model Percepție / Onboarding', 'Citește paginile site-ului ca un bot și descrie ce înțelege despre afacere (recomandat: Gemini Flash, context mare, cost mic).' ),
+		'perception' => array( 'Model Percepție / Onboarding', 'Citește paginile site-ului ca un bot și descrie ce înțelege despre afacere (recomandat: Gemini Flash, context mare, cost mic). Max tokens: minim 16 000 (se aplică automat), recomandat 32 000.' ),
 	);
 
 	/**
