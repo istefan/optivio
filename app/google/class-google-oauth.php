@@ -61,18 +61,19 @@ final class Google_Oauth {
 	 *
 	 * @param string $state     Anti-CSRF state.
 	 * @param string $challenge PKCE S256 challenge.
+	 * @param array  $scopes    Scopes (default: the analytics/ads set; backups use drive.file only).
 	 * @return string
 	 */
-	public static function authorization_url( string $state, string $challenge ): string {
+	public static function authorization_url( string $state, string $challenge, array $scopes = self::SCOPES ): string {
 		return self::AUTH_URL . '?' . http_build_query(
 			array(
 				'client_id'              => (string) Settings_Repository::get( 'integrations.google_client_id' ),
 				'redirect_uri'           => self::redirect_uri(),
 				'response_type'          => 'code',
-				'scope'                  => implode( ' ', self::SCOPES ),
+				'scope'                  => implode( ' ', $scopes ),
 				'access_type'            => 'offline',
 				'prompt'                 => 'consent',
-				'include_granted_scopes' => 'true',
+				'include_granted_scopes' => self::SCOPES === $scopes ? 'true' : 'false',
 				'state'                  => $state,
 				'code_challenge'         => $challenge,
 				'code_challenge_method'  => 'S256',

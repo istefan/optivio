@@ -25,7 +25,7 @@ final class Usp_Builder {
 	/**
 	 * Pillars: key => [label, regex (case-insensitive, unaccented text), phrase template ({1} = first capture)].
 	 */
-	private const PILLARS = array(
+	public const PILLARS = array(
 		'availability'   => array( 'Disponibilitate non-stop', '/\b(non[\s\-]?stop|24\s*\/\s*7|24\s*din\s*24|zi\s+si\s+noapte|inclusiv\s+(in\s+)?weekend)/', 'disponibili non-stop, inclusiv în weekend' ),
 		'response_time'  => array( 'Timp de intervenție garantat', '/\b(?:in|sub|maxim(?:um)?|max\.?)\s+(\d{1,3})\s*(?:de\s+)?(?:minute|min)\b/', 'ajungem în maximum {1} de minute' ),
 		'fixed_price'    => array( 'Preț transparent', '/\b(pret|tarif|cost)(uri)?\s+(fix|fixe|transparent|clar)|fara\s+(costuri|taxe)\s+ascunse|pretul\s+(se\s+)?comunica/', 'preț fix comunicat înainte de începerea lucrării' ),

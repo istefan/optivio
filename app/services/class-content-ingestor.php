@@ -127,6 +127,8 @@ final class Content_Ingestor {
 			return '' === $value ? null : $value;
 		};
 		$modified = (string) ( $item['modified_gmt'] ?? '' );
+		// WordPress drafts / auto-drafts report "0000-00-00 00:00:00", rejected by MySQL strict mode.
+		$modified = 0 === strpos( $modified, '0000-00-00' ) ? '' : $modified;
 		$featured = is_array( $item['featured_image'] ?? null ) ? array(
 			'id'  => absint( $item['featured_image']['id'] ?? 0 ),
 			'src' => mb_substr( (string) ( $item['featured_image']['src'] ?? '' ), 0, 500 ),
@@ -328,7 +330,7 @@ final class Content_Ingestor {
 	 * @param string $base Base URL.
 	 * @return string
 	 */
-	private static function absolute( string $href, string $base ): string {
+	public static function absolute( string $href, string $base ): string {
 		if ( preg_match( '#^https?://#i', $href ) ) {
 			return $href;
 		}

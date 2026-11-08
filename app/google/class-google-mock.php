@@ -36,7 +36,6 @@ final class Google_Mock {
 		$path  = (string) parse_url( $url, PHP_URL_PATH ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
 		$host  = (string) parse_url( $url, PHP_URL_HOST ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
 		$query = self::query( (string) parse_url( $url, PHP_URL_QUERY ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
-		unset( $method );
 
 		if ( 'oauth2.googleapis.com' === $host && '/token' === $path ) {
 			$claims = rtrim( strtr( base64_encode( (string) json_encode( array( 'email' => 'agentie.demo@gmail.com' ) ) ), '+/', '-_' ), '=' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
@@ -53,6 +52,30 @@ final class Google_Mock {
 		}
 		if ( '/revoke' === $path ) {
 			return array( 200, array() );
+		}
+		if ( '/tokeninfo' === $path ) {
+			return array(
+				200,
+				array(
+					'email'      => 'agentie.demo@gmail.com',
+					'expires_in' => 3500,
+				)
+			);
+		}
+		if ( 0 === strpos( $path, '/drive/v3/files' ) ) {
+			if ( '/drive/v3/files' === $path && 'GET' === strtoupper( (string) $method ) ) {
+				return array( 200, array( 'files' => array() ) );
+			}
+			if ( '/drive/v3/files' === $path ) {
+				return array( 200, array( 'id' => 'mock-folder-' . substr( sha1( (string) json_encode( $body ) ), 0, 10 ) ) );
+			}
+			return array(
+				200,
+				array(
+					'id'      => basename( $path ),
+					'trashed' => false,
+				)
+			);
 		}
 		if ( str_ends_with( $path, '/webmasters/v3/sites' ) ) {
 			return array( 200, array( 'siteEntry' => array( array( 'siteUrl' => 'sc-domain:instalatori-non-stop.ro', 'permissionLevel' => 'siteOwner' ), array( 'siteUrl' => 'https://www.clinica-zambet.ro/', 'permissionLevel' => 'siteFullUser' ) ) ) );

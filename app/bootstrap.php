@@ -11,8 +11,8 @@ declare( strict_types = 1 );
 
 defined( 'OPTIVIO_ROOT' ) || exit;
 
-define( 'OPTIVIO_VERSION', '1.4.0' );
-define( 'OPTIVIO_SCHEMA_VERSION', '1.4.0' );
+define( 'OPTIVIO_VERSION', '1.6.0' );
+define( 'OPTIVIO_SCHEMA_VERSION', '1.6.0' );
 define( 'OPTIVIO_APP', OPTIVIO_ROOT . '/app' );
 define( 'OPTIVIO_STORAGE', OPTIVIO_ROOT . '/storage' );
 

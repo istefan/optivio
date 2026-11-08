@@ -47,6 +47,12 @@ final class Settings_Repository {
 		'ai.profile.copy.model'            => 'anthropic/claude-sonnet-5.5',
 		'ai.profile.copy.temperature'      => 0.7,
 		'ai.profile.copy.max_tokens'       => 6000,
+		'ai.profile.perception.model'      => 'google/gemini-2.5-flash',
+		'ai.profile.perception.temperature' => 0.1,
+		'ai.profile.perception.max_tokens' => 8000,
+		'onboarding.max_pages_per_site'    => 50,
+		'onboarding.max_pages_per_run'     => 100,
+		'onboarding.max_input_chars'       => 250000,
 		'ai.monthly_budget_usd'            => 50,
 		'ai.confirm_before_call'           => true,
 
@@ -60,6 +66,7 @@ final class Settings_Repository {
 		'integrations.gsc_backfill_days'   => 90,
 
 		'cron.batch_seconds'               => 45,
+		'cron.interval_minutes'            => 1,
 
 		'spam.threshold_suspect'           => 40,
 		'spam.threshold_spam'              => 70,
@@ -77,6 +84,8 @@ final class Settings_Repository {
 	public const SECRET_KEYS = array(
 		'integrations.google_client_secret',
 		'integrations.ads_developer_token',
+		'cron.web_token',
+		'backup.drive_tokens',
 	);
 
 	/**
