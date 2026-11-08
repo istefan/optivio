@@ -360,3 +360,11 @@ a { text-decoration: none; }
 .ov-choice input { margin-top: .2rem; accent-color: #111827; }
 .ov-choice:has(input:checked) { border: 2px solid #111827; padding: calc(.65rem - 1px) calc(.8rem - 1px); }
 .form-switch .form-check-input:checked { background-color: #111827; border-color: #111827; }
+
+/* Google services per site (Site Kit style) */
+.ov-gservice { padding: .7rem 0; border-bottom: 1px solid #f1f2f4; }
+.ov-gservice:last-child { border-bottom: 0; padding-bottom: 0; }
+.ov-gservice-head { display: flex; align-items: center; gap: .75rem; }
+.ov-gservice-icon { width: 34px; height: 34px; border-radius: 10px; background: #f4f6f8; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; color: var(--ov-ink); }
+.ov-gservice-more { margin: .35rem 0 0 calc(34px + .75rem); font-size: .8rem; }
+.ov-gservice-more summary { color: var(--ov-ink-2); cursor: pointer; }

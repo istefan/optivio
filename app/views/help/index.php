@@ -96,7 +96,7 @@ $ov_steps = static function ( array $steps ): void {
 					'**Confirmă profilul**: formularul vine precompletat. Sub fiecare câmp vedeți „AI a înțeles: …” cu încrederea, sursa și citatul. Alegeți **Corect / Corectez / Nu se aplică**, debifați serviciile deduse greșit, adăugați serviciile reale pe care AI nu le-a găsit și bifați punctele forte reale. La salvare se creează afacerea, site-urile (cu cheia pentru plugin) și serviciile, iar diferențele devin recomandări.',
 					'**USP și reguli**: USP-ul calculat din punctele forte confirmate, regulile permanente, valoarea medie a unei lucrări, capacitatea zilnică și persoana de contact.',
 					'**Plugin**: pentru fiecare site WordPress, descărcați pluginul (cheia e inclusă) și instalați-l. Starea se actualizează singură: „Aștept heartbeat” → „Conectat” → pagini sincronizate. Se poate amâna.',
-					'**Google**: starea integrărilor fiecărui site și linkul spre configurare. Se poate amâna.',
+					'**Google** (ca în Site Kit): **Conectează-te cu Google** cu contul agenției (o singură dată). OptiVio listează proprietățile accesibile și le potrivește cu domeniul fiecărui site (Search Console, fluxul web GA4, containerul Tag Manager, fișa Business Profile, site-ul AdSense). Apăsați **Conectează** pe fiecare serviciu sau **Conectează tot ce am găsit**; „Altă proprietate” permite alegerea manuală. Google Ads nu are domeniu: contul sugerat se conectează doar manual. Prima sincronizare pornește imediat. Se poate amâna.',
 					'**Rezumat**: scorul de pregătire, scorul de claritate, diferențele percepție vs realitate și cardurile create. **Finalizează** rulează o dată motorul determinist.',
 				)
 			);
@@ -279,6 +279,7 @@ $ov_steps = static function ( array $steps ): void {
 				<dt>Wizard: „Nu am găsit un sitemap XML”</dt><dd>Se folosește doar meniul paginii principale. Adăugați manual URL-urile importante (servicii, prețuri, contact).</dd>
 				<dt>Wizard: „Text foarte puțin”</dt><dd>Pagina este randată doar cu JavaScript sau este goală: botul vede aproape nimic. Este chiar o problemă de SEO de discutat cu clientul.</dd>
 				<dt>Wizard: pagini „blocate” de robots.txt</dt><dd>Bifați „Ignoră robots.txt” doar dacă aveți acordul clientului.</dd>
+				<dt>„Răspuns AI în format invalid” sau „trunchiat”</dt><dd>Răspunsul a depășit limita de tokeni de ieșire a profilului Percepție (la zeci de pagini, modelele cu raționament precum Gemini 2.5 consumă mult din limită). OptiVio recuperează automat partea completă a răspunsului; dacă nu se poate, măriți „Max tokens” (Setări → AI, recomandat 32 000) sau trimiteți mai puține pagini. Costul afișat este maximul posibil; costul real este de obicei mult mai mic.</dd>
 				<dt>Analiza AI este blocată sau prea scumpă</dt><dd>Lipsește cheia OpenRouter sau s-ar depăși bugetul lunar. La 100 de pagini, reduceți selecția sau limita de caractere (Setări → AI); un model Gemini Flash costă de obicei câțiva cenți pe analiză.</dd>
 				<dt>„Percepție din interior” nu apare</dt><dd>Pluginul nu este instalat, nu este conectat sau nu a sincronizat încă paginile site-ului. Butonul apare pe fiecare site după sincronizare.</dd>
 				<dt>Ștergere sau arhivare?</dt><dd>Arhivarea (Profil → Stare) este reversibilă. Ștergerea definitivă elimină afacerea și toate datele ei; pluginul de pe site trebuie dezinstalat manual.</dd>

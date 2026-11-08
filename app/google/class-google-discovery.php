@@ -100,7 +100,21 @@ final class Google_Discovery {
 				$out[] = array(
 					'id'    => (string) preg_replace( '#^properties/#', '', (string) $p['property'] ),
 					'label' => ( $a['displayName'] ?? '' ) . ' › ' . ( $p['displayName'] ?? '' ),
+					'uris'  => array(),
 				);
+			}
+		}
+		// Web stream URLs, used to match a property to a site (best effort, max. 60 properties).
+		foreach ( array_slice( array_keys( $out ), 0, 60 ) as $i ) {
+			try {
+				$streams = $c->request( 'GET', 'https://analyticsadmin.googleapis.com/v1beta/properties/' . $out[ $i ]['id'] . '/dataStreams', array( 'pageSize' => 50 ) )['body'];
+				foreach ( (array) ( $streams['dataStreams'] ?? array() ) as $st ) {
+					if ( ! empty( $st['webStreamData']['defaultUri'] ) ) {
+						$out[ $i ]['uris'][] = (string) $st['webStreamData']['defaultUri'];
+					}
+				}
+			} catch ( Throwable $e ) {
+				unset( $e );
 			}
 		}
 		return $out;
@@ -122,6 +136,7 @@ final class Google_Discovery {
 					'id'    => (string) $ct['publicId'],
 					'label' => ( $a['name'] ?? '' ) . ' › ' . ( $ct['name'] ?? '' ),
 					'path'  => (string) $ct['path'],
+					'uris'  => array_values( array_map( 'strval', (array) ( $ct['domainName'] ?? array() ) ) ),
 				);
 			}
 		}
@@ -158,9 +173,21 @@ final class Google_Discovery {
 		$body = $c->request( 'GET', 'https://adsense.googleapis.com/v2/accounts' )['body'];
 		$out  = array();
 		foreach ( (array) ( $body['accounts'] ?? array() ) as $a ) {
+			$uris = array();
+			try {
+				$sites = $c->request( 'GET', 'https://adsense.googleapis.com/v2/' . $a['name'] . '/sites', array( 'pageSize' => 200 ) )['body'];
+				foreach ( (array) ( $sites['sites'] ?? array() ) as $st ) {
+					if ( ! empty( $st['domain'] ) ) {
+						$uris[] = (string) $st['domain'];
+					}
+				}
+			} catch ( Throwable $e ) {
+				unset( $e );
+			}
 			$out[] = array(
 				'id'    => (string) preg_replace( '#^accounts/#', '', (string) $a['name'] ),
 				'label' => (string) ( $a['displayName'] ?? $a['name'] ),
+				'uris'  => $uris,
 			);
 		}
 		return $out;
@@ -188,6 +215,7 @@ final class Google_Discovery {
 				$out[] = array(
 					'id'    => (string) $l['name'],
 					'label' => ( $l['title'] ?? '' ) . ( ! empty( $l['websiteUri'] ) ? ' — ' . $l['websiteUri'] : '' ),
+					'uris'  => ! empty( $l['websiteUri'] ) ? array( (string) $l['websiteUri'] ) : array(),
 				);
 			}
 		}

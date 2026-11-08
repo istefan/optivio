@@ -130,6 +130,9 @@ return static function ( Router $r ): void {
 	$r->add( 'GET', '/onboarding/{id}/plugin', array( Onboarding_Controller::class, 'plugin_view' ), $admin );
 	$r->add( 'GET', '/onboarding/{id}/status', array( Onboarding_Controller::class, 'status' ), $admin );
 	$r->add( 'GET', '/onboarding/{id}/google', array( Onboarding_Controller::class, 'google_view' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/google/discover', array( Onboarding_Controller::class, 'google_discover' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/google/{site_id}/auto', array( Onboarding_Controller::class, 'google_auto' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/google/{site_id}/{provider}', array( Onboarding_Controller::class, 'google_connect' ), $admin );
 	$r->add( 'POST', '/onboarding/{id}/advance/{step}', array( Onboarding_Controller::class, 'advance' ), $admin );
 	$r->add( 'GET', '/onboarding/{id}/summary', array( Onboarding_Controller::class, 'summary_view' ), $admin );
 	$r->add( 'POST', '/onboarding/{id}/finish', array( Onboarding_Controller::class, 'finish' ), $admin );
