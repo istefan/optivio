@@ -36,10 +36,9 @@ final class Help_Controller extends Controller {
 			'help/index',
 			array(
 				'page_title'    => 'Ajutor',
-				'page_subtitle' => 'Ghid pas cu pas: configurare, adăugarea unei afaceri, plugin WordPress, integrări și lucrul zilnic',
+				'page_subtitle' => 'Ghid pas cu pas: configurare, wizard-ul de onboarding, plugin WordPress, integrări, backup și lucrul zilnic',
 				'guides'        => $guides,
 				'is_admin'      => Gate::is_super_admin( $this->user() ),
-				'cron_command'  => '*/5 * * * * /usr/local/bin/php ' . OPTIVIO_ROOT . '/bin/cron.php >/dev/null 2>&1',
 			)
 		);
 	}

@@ -36,8 +36,6 @@ return array(
 
 	// One-time token required by the web installer (/setup). Only works while no user exists.
 	'install_token'    => '',
-	// Token for HTTP cron trigger (/cron/run?token=...). Leave empty to disable HTTP cron.
-	'cron_token'       => '',
 
 	// DEVELOPMENT ONLY: serve Google API calls from local fixtures (ignored when app_env = production).
 	'google_mock'      => false,

@@ -206,10 +206,31 @@ final class Integration_Guides {
 					'Creați un cont pe openrouter.ai și adăugați credite (Settings → Credits).',
 					'Settings → API keys → „Create key”; opțional setați o limită de credit pe cheie.',
 					'Lipiți cheia în OptiVio → Setări → AI / OpenRouter (cheie globală) sau, per client, în pagina afacerii → AI & conectori.',
-					'Alegeți modelele pentru cele 3 profiluri (ID-uri din lista de modele OpenRouter, ex. furnizor/model), bugetul lunar și confirmarea înainte de fiecare apel.',
+					'Alegeți modelele pentru cele 4 profiluri (ID-uri din lista de modele OpenRouter, ex. furnizor/model), bugetul lunar și confirmarea înainte de fiecare apel. Pentru profilul „Percepție / Onboarding” (citirea a până la 100 de pagini) este recomandat un model Gemini Flash: context mare, cost mic.',
+					'Apăsați „Testează conexiunea” lângă cheie: verifică cheia și consumul, fără să apeleze vreun model.',
 				),
 				'notes'   => array(
 					'AI-ul nu rulează niciodată automat (cron, sincronizări, plugin) — doar la butonul unui utilizator.',
+				),
+			),
+			'gdrive'       => array(
+				'title'   => 'Google Drive (backup)',
+				'icon'    => 'bi-cloud-arrow-up',
+				'summary' => 'Backup automat al bazei de date și al fișierelor într-un folder din Google Drive. Se folosește același client OAuth ca la integrările Google.',
+				'links'   => array(
+					array( 'Activează Google Drive API', 'https://console.cloud.google.com/apis/library/drive.googleapis.com' ),
+					array( 'Ecran de consimțământ OAuth', 'https://console.cloud.google.com/apis/credentials/consent' ),
+				),
+				'steps'   => array(
+					'În proiectul Google Cloud al OptiVio, activați „Google Drive API”.',
+					'Clientul OAuth (Client ID / Client Secret) și URI-ul de redirecționare sunt aceleași ca la integrările Google: {redirect_uri}. Nu trebuie adăugat nimic nou.',
+					'Dacă aplicația OAuth este „External” în mod Testing, contul Google în care salvați backup-urile trebuie să fie la „Test users”.',
+					'În OptiVio → Administrare → Backup Google Drive apăsați „Conectează Google Drive” și acceptați permisiunea de acces la fișierele create de aplicație (drive.file).',
+					'Alegeți ce se salvează (bază de date, fișiere), periodicitatea, ora și câte backup-uri se păstrează (1–30), apoi „Salvează configurarea”.',
+				),
+				'notes'   => array(
+					'Cu permisiunea drive.file, OptiVio vede doar folderul și fișierele create de el, nu restul documentelor din Drive.',
+					'Backup-ul rulează prin cron-ul automat al aplicației: nu trebuie configurat nimic în cPanel.',
 				),
 			),
 		);

@@ -52,6 +52,7 @@ final class Settings_Controller extends Controller {
 		'fast'      => array( 'Model Rapid / Audit', 'Clasificări, rezumate și verificări rapide.' ),
 		'reasoning' => array( 'Model Raționament / Strategie', 'Analiza profundă multi-sursă și strategia Ads/SEO.' ),
 		'copy'      => array( 'Model Copywriting / Conținut', 'Titluri, meta descrieri, articole și landing page-uri.' ),
+		'perception' => array( 'Model Percepție / Onboarding', 'Citește paginile site-ului ca un bot și descrie ce înțelege despre afacere (recomandat: Gemini Flash, context mare, cost mic).' ),
 	);
 
 	/**
@@ -89,11 +90,34 @@ final class Settings_Controller extends Controller {
 				'ai_profiles'        => self::AI_PROFILES,
 				'job_stats'          => Job_Queue::stats(),
 				'cron_runs'          => Cron_Runner::recent( 8 ),
-				'cron_http_enabled'  => strlen( (string) Config::get( 'cron_token', '' ) ) >= 24,
+				'web_cron'           => \OptiVio\Services\Web_Cron::status(),
 				'timezones'          => DateTimeZone::listIdentifiers( DateTimeZone::EUROPE ),
 				'oauth_redirect'     => ov_url( '/oauth/google/callback' ),
 			)
 		);
+	}
+
+	/**
+	 * POST /settings/test/{provider} — "Testează conexiunea" (JSON).
+	 *
+	 * @return void
+	 */
+	public function test_connection(): void {
+		$provider = $this->request->param_key( 'provider' );
+		if ( ! isset( \OptiVio\Services\Connection_Tester::PROVIDERS[ $provider ] ) ) {
+			throw \OptiVio\Core\Http_Exception::not_found();
+		}
+		$result = \OptiVio\Services\Connection_Tester::test( $provider );
+		Audit_Log::record(
+			'settings.test_connection',
+			'settings',
+			null,
+			array(
+				'provider' => $provider,
+				'ok'       => $result['ok'],
+			)
+		);
+		\OptiVio\Core\Response::json( $result );
 	}
 
 	/**
@@ -249,6 +273,17 @@ final class Settings_Controller extends Controller {
 		$budget = absint( $this->request->input( 'monthly_budget_usd', 0 ) );
 		$v->between( 'monthly_budget_usd', $budget, 0, 100000 );
 		$values['ai.monthly_budget_usd']  = $budget;
+
+		$limits = array(
+			'max_pages_per_site' => array( 1, 50 ),
+			'max_pages_per_run'  => array( 1, 100 ),
+			'max_input_chars'    => array( 20000, 1000000 ),
+		);
+		foreach ( $limits as $field => $range ) {
+			$value = absint( $this->request->input( 'onboarding_' . $field, 0 ) );
+			$v->between( 'onboarding_' . $field, $value, $range[0], $range[1] );
+			$values[ 'onboarding.' . $field ] = $value;
+		}
 		$values['ai.confirm_before_call'] = '1' === (string) $this->request->input( 'confirm_before_call', '0' );
 		return $values;
 	}
@@ -342,8 +377,12 @@ final class Settings_Controller extends Controller {
 	 * @return array
 	 */
 	private function collect_cron( Validator $v ): array {
-		$seconds = absint( $this->request->input( 'batch_seconds', 45 ) );
-		$v->between( 'batch_seconds', $seconds, 10, 55 );
-		return array( 'cron.batch_seconds' => $seconds );
+		$seconds  = absint( $this->request->input( 'batch_seconds', 45 ) );
+		$interval = absint( $this->request->input( 'interval_minutes', 1 ) );
+		$v->between( 'batch_seconds', $seconds, 10, 55 )->between( 'interval_minutes', $interval, 1, 15 );
+		return array(
+			'cron.batch_seconds'    => $seconds,
+			'cron.interval_minutes' => $interval,
+		);
 	}
 }

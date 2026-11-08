@@ -1,6 +1,6 @@
 <?php
 /**
- * OptiVio — Generates master_key, install_token and cron_token values for config.php.
+ * OptiVio — Generates master_key and install_token values for config.php.
  *
  * Usage: php bin/generate-key.php
  *
@@ -21,4 +21,3 @@ $ov_token = static function ( int $bytes ): string {
 
 fwrite( STDOUT, "'master_key'    => '" . base64_encode( random_bytes( 32 ) ) . "',\n" ); // phpcs:ignore
 fwrite( STDOUT, "'install_token' => '" . $ov_token( 24 ) . "',\n" ); // phpcs:ignore
-fwrite( STDOUT, "'cron_token'    => '" . $ov_token( 32 ) . "',\n" ); // phpcs:ignore

@@ -45,6 +45,9 @@ $ov_credential = static function ( string $provider, string $help ) use ( $view 
 			<?php else : ?>
 				<span class="ov-badge">neconfigurată</span>
 			<?php endif; ?>
+			<?php if ( null !== $ov_cred || 'pagespeed' === $provider ) : ?>
+				<span class="ms-auto"><?php ov_test_button( $provider ); ?></span>
+			<?php endif; ?>
 		</div>
 		<p class="ov-cell-sub mb-2"><?php echo esc_html( $help ); ?></p>
 		<div class="d-flex flex-wrap gap-2">
@@ -173,6 +176,13 @@ $ov_credential = static function ( string $provider, string $help ) use ( $view 
 						</div>
 					</div>
 				</div>
+				<div class="ov-section-label mt-4">Onboarding — analiza percepției</div>
+				<div class="row g-3">
+					<?php $ov_number_field( 'onboarding_max_pages_per_site', 'Pagini maxime pe site', $ov_s['onboarding.max_pages_per_site'], 1, 50 ); ?>
+					<?php $ov_number_field( 'onboarding_max_pages_per_run', 'Pagini maxime pe analiză', $ov_s['onboarding.max_pages_per_run'], 1, 100 ); ?>
+					<?php $ov_number_field( 'onboarding_max_input_chars', 'Text maxim trimis la AI', $ov_s['onboarding.max_input_chars'], 20000, 1000000, 'caractere' ); ?>
+				</div>
+				<p class="ov-cell-sub mt-2 mb-0">Peste limita de text, paginile se prioritizează (acasă, servicii, prețuri, despre, contact) și se trunchiază proporțional.</p>
 				<button class="btn btn-dark mt-4" type="submit">Salvează profilurile</button>
 			</form>
 		</div>
@@ -218,6 +228,7 @@ $ov_credential = static function ( string $provider, string $help ) use ( $view 
 						<label class="form-label" for="oauth_redirect">URI de redirecționare autorizat (Google Cloud Console)</label>
 						<input class="form-control" id="oauth_redirect" readonly value="<?php echo esc_attr( $view['oauth_redirect'] ); ?>">
 					</div>
+					<div class="col-12"><?php ov_test_button( 'google_oauth', 'Testează clientul OAuth și conturile conectate' ); ?></div>
 				</div>
 				<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
 					<div class="ov-section-label mb-0">Google Ads API & Search Console</div>
@@ -242,7 +253,10 @@ $ov_credential = static function ( string $provider, string $help ) use ( $view 
 						<label class="form-label" for="gsc_backfill_days">Istoric GSC la prima sincronizare</label>
 						<div class="input-group"><input class="form-control" type="number" id="gsc_backfill_days" name="gsc_backfill_days" min="7" max="480" value="<?php echo esc_attr( (string) $ov_s['integrations.gsc_backfill_days'] ); ?>"><span class="input-group-text">zile</span></div>
 					</div>
-					<div class="col-12"><a class="ov-link-more" href="<?php echo esc_url( ov_url( '/google' ) ); ?>">Conturi Google conectate →</a></div>
+					<div class="col-12 d-flex flex-wrap align-items-center gap-3">
+						<?php ov_test_button( 'ads', 'Testează developer token-ul' ); ?>
+						<a class="ov-link-more" href="<?php echo esc_url( ov_url( '/google' ) ); ?>">Conturi Google conectate →</a>
+					</div>
 				</div>
 				<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
 					<div class="ov-section-label mb-0">SERP (Serper.dev) & PageSpeed</div>
@@ -278,6 +292,15 @@ $ov_credential = static function ( string $provider, string $help ) use ( $view 
 				<div class="ov-card-header"><h2 class="ov-card-title">Chei API globale</h2></div>
 				<?php $ov_credential( 'serper', 'Extragerea automată a concurenților din Google. Fără cheie, concurenții se adaugă manual (URL) și sunt scanați direct din PHP.' ); ?>
 				<?php $ov_credential( 'pagespeed', 'Opțională — crește cota zilnică a PageSpeed Insights API.' ); ?>
+			</div>
+			<div class="ov-card mt-3">
+				<div class="ov-card-header"><h2 class="ov-card-title">Verificare rapidă a conexiunilor</h2></div>
+				<p class="ov-cell-sub">Fiecare test face cel mai ieftin apel care dovedește că cheia funcționează. Serper consumă 1 credit; testul OpenRouter nu apelează niciun model.</p>
+				<div class="d-flex flex-column gap-2">
+					<?php foreach ( \OptiVio\Services\Connection_Tester::PROVIDERS as $ov_tp => $ov_tl ) : ?>
+						<div class="d-flex flex-wrap align-items-center gap-2"><span class="flex-grow-1"><?php echo esc_html( $ov_tl ); ?></span><?php ov_test_button( $ov_tp, 'Testează' ); ?></div>
+					<?php endforeach; ?>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -345,17 +368,36 @@ $ov_credential = static function ( string $provider, string $help ) use ( $view 
 				<?php echo ov_csrf_field(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<div class="row g-3">
 					<?php $ov_number_field( 'batch_seconds', 'Buget de timp per rulare', $ov_s['cron.batch_seconds'], 10, 55, 'sec' ); ?>
+					<?php $ov_number_field( 'interval_minutes', 'Interval minim între rulări', $ov_s['cron.interval_minutes'], 1, 15, 'min' ); ?>
 				</div>
 				<button class="btn btn-dark mt-3" type="submit">Salvează</button>
 			</form>
 		</div>
 		<div class="col-12 col-xl-7 d-flex flex-column gap-3">
 			<div class="ov-card">
-				<div class="ov-card-header"><h2 class="ov-card-title">Configurare Cron Job (cPanel)</h2></div>
-				<p class="ov-cell-sub">Recomandat: la fiecare 5 minute, prin CLI.</p>
-				<code class="ov-code mb-3">*/5 * * * * /usr/local/bin/php <?php echo esc_html( OPTIVIO_ROOT ); ?>/bin/cron.php &gt;/dev/null 2&gt;&amp;1</code>
-				<p class="ov-cell-sub mb-1">Alternativ (fără CLI), trigger HTTP cu token — <?php echo esc_html( ! empty( $view['cron_http_enabled'] ) ? 'activ' : 'dezactivat: setați cron_token (min. 24 caractere) în config.php' ); ?>:</p>
-				<code class="ov-code"><?php echo esc_html( ov_url( '/cron/run', array( 'token' => 'CRON_TOKEN' ) ) ); ?></code>
+				<?php $ov_wc = (array) $view['web_cron']; ?>
+				<div class="ov-card-header">
+					<div>
+						<h2 class="ov-card-title">Cron automat (fără cPanel)</h2>
+						<p class="ov-card-subtitle">Ca la WordPress: nu trebuie configurat nimic pe server.</p>
+					</div>
+					<span class="ov-badge <?php echo esc_attr( false === $ov_wc['ok'] ? 'ov-badge-warning' : 'ov-badge-success' ); ?>"><?php echo esc_html( false === $ov_wc['ok'] ? 'mod rezervă' : 'activ' ); ?></span>
+				</div>
+				<p class="mb-2">Joburile rulează singure, în fundal, după orice accesare a aplicației: paginile deschise de utilizatori și cererile trimise de pluginul OptiVio Connector de pe site-urile clienților (heartbeat, click-uri, formulare, conținut).</p>
+				<dl class="ov-dl">
+					<dt>Ultima declanșare</dt><dd><?php echo esc_html( $ov_wc['last'] > 0 ? ov_datetime( gmdate( 'Y-m-d H:i:s', (int) $ov_wc['last'] ), 'd.m.Y H:i:s' ) : 'încă nu' ); ?></dd>
+					<dt>Cerere internă (loopback)</dt>
+					<dd>
+						<?php if ( null === $ov_wc['ok'] ) : ?>
+							netestată încă
+						<?php elseif ( $ov_wc['ok'] ) : ?>
+							funcționează
+						<?php else : ?>
+							blocată de gazdă (<?php echo esc_html( (string) $ov_wc['error'] ); ?>) — joburile pornesc după răspuns sau din browserul utilizatorilor autentificați
+						<?php endif; ?>
+					</dd>
+				</dl>
+				<p class="ov-cell-sub mb-0">Dacă nimeni nu deschide aplicația și niciun plugin nu raportează, joburile întârzie până la următoarea accesare. Butonul „Rulează coada acum” pornește imediat procesarea.</p>
 			</div>
 			<div class="ov-card">
 				<div class="ov-card-header"><h2 class="ov-card-title">Ultimele rulări</h2></div>

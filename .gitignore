@@ -3,6 +3,7 @@
 /storage/sessions/*
 /storage/uploads/*
 /storage/cache/*
+/storage/backups/*
 !/storage/*/.gitkeep
 /vendor/
 .DS_Store

@@ -23,6 +23,9 @@ if ( ! OptiVio\Core\Config::is_loaded() ) {
 	exit( 1 );
 }
 
+// Apply pending database upgrades (same as the first web request after a deploy).
+OptiVio\Core\Migrator::ensure();
+
 /**
  * Parses --key=value CLI options.
  *

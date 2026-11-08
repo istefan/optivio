@@ -20,6 +20,7 @@ $ov_tabs = array(
 	'usp'       => array( '/usp', 'USP', true ),
 	'sites'     => array( '/sites', 'Site-uri', true ),
 	'rules'     => array( '/rules', 'Reguli', true ),
+	'perception' => array( '/perception', 'Percepție', true ),
 	'ai'        => array( '/ai', 'AI & conectori', true ),
 );
 ?>

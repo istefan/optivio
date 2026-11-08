@@ -78,6 +78,25 @@ final class Google_Controller extends Controller {
 	 * @return void
 	 */
 	public function connect(): void {
+		$this->start_oauth( 'accounts' );
+	}
+
+	/**
+	 * Connects Google Drive for backups (scope drive.file, same OAuth client and redirect URI).
+	 *
+	 * @return void
+	 */
+	public function connect_drive(): void {
+		$this->start_oauth( 'drive' );
+	}
+
+	/**
+	 * Starts the Google authorization for the accounts (analytics/ads) or for the Drive backups.
+	 *
+	 * @param string $purpose accounts|drive.
+	 * @return void
+	 */
+	public function start_oauth( string $purpose ): void {
 		if ( ! Google_Oauth::is_configured() ) {
 			$this->redirect_with( '/settings?tab=integrations', 'error', 'Completați Client ID și Client Secret Google în Setări → Integrări.' );
 		}
@@ -89,13 +108,14 @@ final class Google_Controller extends Controller {
 				'state'    => $state,
 				'verifier' => $pkce['verifier'],
 				'expires'  => time() + 600,
+				'purpose'  => 'drive' === $purpose ? 'drive' : 'accounts',
 			)
 		);
 
 		if ( Google_Http::is_mock() ) {
 			Response::redirect( ov_url( '/oauth/google/callback', array( 'code' => 'mock-code', 'state' => $state ) ) );
 		}
-		header( 'Location: ' . Google_Oauth::authorization_url( $state, $pkce['challenge'] ), true, 302 );
+		header( 'Location: ' . Google_Oauth::authorization_url( $state, $pkce['challenge'], 'drive' === $purpose ? \OptiVio\Services\Backup_Drive::SCOPES : Google_Oauth::SCOPES ), true, 302 );
 		exit;
 	}
 
@@ -121,6 +141,17 @@ final class Google_Controller extends Controller {
 		$result = Google_Oauth::exchange( $code, (string) $pending['verifier'] );
 		if ( ! $result['ok'] || '' === (string) ( $result['email'] ?? '' ) ) {
 			$this->redirect_with( '/google', 'error', 'Conectarea contului Google a eșuat: ' . ( $result['error'] ?? 'email lipsă' ) );
+		}
+
+		if ( 'drive' === ( $pending['purpose'] ?? 'accounts' ) ) {
+			\OptiVio\Services\Backup_Drive::store( (array) $result['tokens'], (string) $result['email'], (int) $this->user()['id'] );
+			Audit_Log::record( 'backup.drive_connect', 'settings', null, array( 'email' => $result['email'] ) );
+			try {
+				\OptiVio\Services\Backup_Drive::folder_id();
+			} catch ( Throwable $e ) {
+				$this->redirect_with( '/backup', 'warning', 'Google Drive conectat, dar folderul nu a putut fi creat: ' . $e->getMessage() . ' (activați Google Drive API în Google Cloud).' );
+			}
+			$this->redirect_with( '/backup', 'success', 'Google Drive conectat: ' . $result['email'] . '.' );
 		}
 
 		$id = Google_Client::store_account( (string) $result['email'], (array) $result['tokens'], (int) $this->user()['id'] );

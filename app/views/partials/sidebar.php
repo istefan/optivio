@@ -61,12 +61,14 @@ $ov_menu = array(
 );
 
 if ( $ov_admin ) {
+	$ov_menu[0]['items'][] = array( '/onboarding', 'bi-magic', 'Afacere nouă (wizard)', 'prefix' );
 	$ov_menu[] = array(
 		'id'    => 'admin',
 		'label' => 'Administrare',
 		'items' => array(
 			array( '/users', 'bi-people', 'Utilizatori', 'prefix' ),
 			array( '/audit', 'bi-shield-check', 'Jurnal audit', 'prefix' ),
+			array( '/backup', 'bi-cloud-arrow-up', 'Backup Google Drive', 'prefix' ),
 			array( '/settings', 'bi-sliders', 'Setări', 'prefix' ),
 		),
 	);

@@ -39,6 +39,8 @@ final class Job_Handlers {
 			'google.sync'         => array( \OptiVio\Google\Google_Sync::class, 'handle' ),
 			'engine.run'          => array( \OptiVio\Engine\Engine_Runner::class, 'handle_run' ),
 			'competitors.scan'    => array( \OptiVio\Engine\Engine_Runner::class, 'handle_scan' ),
+			'onboarding.fetch'    => array( \OptiVio\Onboarding\Drafts::class, 'handle_fetch' ),
+			'backup.run'          => array( Backup_Service::class, 'handle' ),
 		);
 	}
 
@@ -89,6 +91,7 @@ final class Job_Handlers {
 		);
 		\OptiVio\Google\Google_Sync::schedule();
 		\OptiVio\Engine\Engine_Runner::schedule();
+		Backup_Service::schedule();
 	}
 
 	/**
@@ -155,6 +158,7 @@ final class Job_Handlers {
 		$db->query( "DELETE FROM jobs WHERE status IN ('done','cancelled') AND finished_at < UTC_TIMESTAMP() - INTERVAL 14 DAY" );
 		$db->query( 'DELETE FROM cron_runs WHERE started_at < UTC_TIMESTAMP() - INTERVAL 30 DAY' );
 		$db->query( 'DELETE FROM audit_logs WHERE created_at < UTC_TIMESTAMP() - INTERVAL ? DAY', array( $retention ) );
+		\OptiVio\Onboarding\Drafts::purge_stale();
 
 		return null;
 	}

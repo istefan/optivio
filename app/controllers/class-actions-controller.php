@@ -82,6 +82,11 @@ final class Actions_Controller extends Controller {
 	 * @return void
 	 */
 	public function show(): void {
+		// Links from other pages (e.g. the Perception tab) open the card's business as the active one.
+		$owner = (int) Database::instance()->get_var( 'SELECT business_id FROM action_cards WHERE id = ?', array( $this->request->param_int( 'id' ) ) );
+		if ( $owner > 0 && $owner !== Gate::active_business_id() && Gate::can_access_business( $owner ) ) {
+			\OptiVio\Core\Session::set( 'active_business_id', $owner );
+		}
 		$business = $this->business();
 		$card     = $this->card( $business );
 		$db       = Database::instance();

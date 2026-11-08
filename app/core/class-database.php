@@ -261,13 +261,17 @@ final class Database {
 	}
 
 	/**
-	 * Runs a callback inside a transaction.
+	 * Runs a callback inside a transaction. Re-entrant: a nested call joins the outer
+	 * transaction (the outermost call commits or rolls back).
 	 *
 	 * @param callable $callback Callback receiving this instance.
 	 * @return mixed Callback result.
 	 * @throws Throwable Re-thrown after rollback.
 	 */
 	public function transaction( callable $callback ) {
+		if ( $this->pdo->inTransaction() ) {
+			return $callback( $this );
+		}
 		$this->pdo->beginTransaction();
 		try {
 			$result = $callback( $this );

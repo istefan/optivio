@@ -23,6 +23,9 @@ $ov_app_name = (string) ( $view['app_name'] ?? 'OptiVio' );
 	<meta name="robots" content="noindex, nofollow">
 	<meta name="csrf-token" content="<?php echo esc_attr( $view['csrf_token'] ?? '' ); ?>">
 	<meta name="app-url" content="<?php echo esc_url( ov_url( '/' ) ); ?>">
+	<?php if ( \OptiVio\Services\Web_Cron::needs_browser_tick() ) : ?>
+		<meta name="ov-cron-tick" content="<?php echo esc_url( ov_url( '/cron/tick' ) ); ?>">
+	<?php endif; ?>
 	<title><?php echo esc_html( ( $view['page_title'] ?? '' ) . ' · ' . $ov_app_name ); ?></title>
 	<link rel="icon" href="<?php echo esc_url( ov_asset( 'img/favicon.svg' ) ); ?>" type="image/svg+xml">
 	<link rel="stylesheet" href="<?php echo esc_url( ov_asset( 'vendor/bootstrap/bootstrap.min.css' ) ); ?>">

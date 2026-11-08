@@ -13,10 +13,12 @@ namespace OptiVio\Controllers;
 
 use OptiVio\Core\Database;
 use OptiVio\Core\Http_Exception;
+use OptiVio\Core\Session;
 use OptiVio\Core\Validator;
 use OptiVio\Repositories\Businesses_Repository;
 use OptiVio\Security\Audit_Log;
 use OptiVio\Security\Gate;
+use OptiVio\Services\Business_Deleter;
 use OptiVio\Services\Readiness_Score;
 
 defined( 'OPTIVIO_ROOT' ) || exit;
@@ -165,6 +167,71 @@ final class Businesses_Controller extends Controller {
 		}
 		Audit_Log::record( 'business.update', 'business', $id, array( 'changed' => $changed ), $id );
 		$this->redirect_with( '/businesses/' . $id, 'success', 'Modificările au fost salvate.' );
+	}
+
+	/**
+	 * Confirmation page for the permanent deletion (Super Admin).
+	 *
+	 * @return void
+	 */
+	public function confirm_delete(): void {
+		$id       = $this->request->param_int( 'id' );
+		$business = Businesses_Repository::find( $id );
+		if ( null === $business ) {
+			throw new Http_Exception( 404 );
+		}
+		$this->render(
+			'businesses/delete',
+			array(
+				'page_title'    => 'Ștergere definitivă',
+				'page_subtitle' => (string) $business['name'],
+				'business'      => $business,
+				'summary'       => Business_Deleter::summary( $id ),
+				'errors'        => $this->pull_errors(),
+			)
+		);
+	}
+
+	/**
+	 * Permanently deletes a business (name typed + password re-authentication).
+	 *
+	 * @return void
+	 */
+	public function destroy(): void {
+		$id       = $this->request->param_int( 'id' );
+		$business = Businesses_Repository::find( $id );
+		if ( null === $business ) {
+			throw new Http_Exception( 404 );
+		}
+		$back   = '/businesses/' . $id . '/delete';
+		$errors = array();
+		if ( trim( (string) $this->request->input( 'confirm_name', '' ) ) !== (string) $business['name'] ) {
+			$errors['confirm_name'] = 'Numele nu corespunde.';
+		}
+		$hash = (string) Database::instance()->get_var( 'SELECT password_hash FROM users WHERE id = ?', array( (int) $this->user()['id'] ) );
+		if ( ! password_verify( (string) $this->request->input( 'password', '' ), $hash ) ) {
+			$errors['password'] = 'Parola este greșită.';
+		}
+		if ( ! empty( $errors ) ) {
+			Audit_Log::record( 'business.delete_denied', 'business', $id, array( 'fields' => array_keys( $errors ) ), $id );
+			$this->back_with_errors( $back, $errors, array() );
+		}
+
+		$deleted = Business_Deleter::delete( $id );
+		if ( (int) Session::get( 'active_business_id', 0 ) === $id ) {
+			Session::remove( 'active_business_id' );
+		}
+		Audit_Log::record(
+			'business.deleted',
+			'business',
+			$id,
+			array(
+				'name'    => (string) $business['name'],
+				'deleted' => array_filter( $deleted ),
+			),
+			null
+		);
+		$this->redirect_with( '/businesses', 'success', 'Afacerea „' . $business['name'] . '” și toate datele ei au fost șterse definitiv.' );
 	}
 
 	/**

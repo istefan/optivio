@@ -23,7 +23,7 @@ final class Ai_Profiles_Repository {
 	/**
 	 * Profile keys.
 	 */
-	public const PROFILES = array( 'fast', 'reasoning', 'copy' );
+	public const PROFILES = array( 'fast', 'reasoning', 'copy', 'perception' );
 
 	/**
 	 * Overrides of a business keyed by profile.

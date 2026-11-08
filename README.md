@@ -15,7 +15,7 @@ Platformă centralizată pentru gestionarea afacerilor clienților, a prezenței
 | Bază de date | MySQL 8.0+ / MariaDB 10.6+ (InnoDB, utf8mb4) | Standard pe shared hosting |
 | Acces DB | PDO, prepared statements native (`EMULATE_PREPARES = false`) | Zero SQL injection |
 | UI | Bootstrap 5.3 + Bootstrap Icons + Chart.js 4 — **găzduite local** în `public/assets/vendor` | CSP strict `script-src 'self'`, fără CDN |
-| Procese grele | Coadă de joburi în MySQL (`jobs`) + Cron (CLI sau HTTP) + AJAX batching | Fără daemon-uri |
+| Procese grele | Coadă de joburi în MySQL (`jobs`) + cron web automat (ca WP-Cron, fără cPanel) + AJAX batching | Fără daemon-uri, fără configurare pe server |
 | Coding standard | WordPress Coding Standards (`phpcs.xml.dist`) | Cerință proiect |
 
 ## 2. Structura proiectului
@@ -31,8 +31,8 @@ optivio/
 │   ├── bootstrap.php         # Autoloader, config, erori, sesiune, headere
 │   ├── helpers.php           # esc_html(), esc_attr(), esc_url(), sanitize_*(), ov_url() ...
 │   ├── routes.php            # Toate rutele (metodă, cale, handler, rol)
-│   ├── core/                 # Config, Database, Request, Response, Router, Session, Csrf,
-│   │                         # Crypto (AES-256-GCM), View, Http_Exception, Job_Queue, Validator
+│   ├── core/                 # Config, Database, Request, Response, Router, Session, Csrf, Migrator,
+│   │                         # Crypto (AES-256-GCM), View, Http_Exception, Job_Queue, Validator, Zip_Stream
 │   ├── security/             # Auth, Gate (RBAC + anti-IDOR), Rate_Limiter, Audit_Log, Password_Policy
 │   ├── repositories/         # Acces date (SQL doar aici): Users, Businesses, Settings, Audit, ...
 │   ├── services/             # Logică deterministă (Dashboard_Metrics, Readiness_Score, Usp_Builder, Ai_Config, Repuvio_Connector...)
@@ -40,13 +40,14 @@ optivio/
 │   ├── engine/               # Motorul determinist: audit SEO, insight-uri, cuvinte cheie, strategie Ads, concurență
 │   ├── ai/                   # Client OpenRouter on-demand (gardă, buget, cost), snapshot determinist, prompturi, mock
 │   ├── actions/              # Action Cards: validare, generator determinist, analiză profundă, aplicare / rollback
+│   ├── onboarding/           # Wizard: descoperire pagini, extragere deterministă, percepția AI, diferențe percepție/realitate
 │   ├── controllers/          # Controllere HTTP subțiri
 │   └── views/                # Template-uri PHP (late escaping obligatoriu)
 ├── bin/                      # Scripturi CLI: install, cron, generate-key, seed-demo, dev-router
 ├── config/                   # config.php (NU se versionează) + config.sample.php
-├── storage/                  # logs/, sessions/, uploads/, cache/ — în afara webroot, .htaccess deny
+├── storage/                  # logs/, sessions/, uploads/, cache/, backups/ — în afara webroot, .htaccess deny
 ├── plugin/optivio-connector/ # Sursa pluginului WordPress OptiVio Connector (împachetat per site din OptiVio)
-├── database/upgrades/        # Scripturi de upgrade pentru baze existente (1.1.0.sql, ...)
+├── database/upgrades/        # Upgrade-uri aplicate AUTOMAT la primul request după deploy (1.1.0.sql, ...)
 ├── schema.sql                # Schema COMPLETĂ (rescrisă integral la fiecare modificare)
 ├── CLAUDE.md                 # Ghid pentru asistenți AI / dezvoltatori
 ├── RULES.md                  # Reguli obligatorii (securitate, standarde, AI on-demand)
@@ -58,6 +59,8 @@ optivio/
 ### 3.1 Flux request
 ```
 Apache/LiteSpeed → public/index.php → app/bootstrap.php
+  → Migrator::ensure() (aplică automat database/upgrades/*.sql după un deploy; gratuit după prima verificare)
+  → Web_Cron::register() (după răspuns: tick de cron dacă e cazul)
   → Session::start() (cookie HttpOnly/Secure/SameSite=Lax, save_path privat)
   → Security headers (CSP, XFO, nosniff, Referrer-Policy, HSTS pe HTTPS)
   → Router::dispatch()
@@ -82,15 +85,15 @@ Apache/LiteSpeed → public/index.php → app/bootstrap.php
 - Action Cards deterministe se generează gratuit din insight-uri și audit (`Actions\Card_Generator`, la fiecare rulare a motorului); AI-ul (analiza profundă, completarea textelor unui card) rulează doar la butonul utilizatorului, cu confirmare de cost și buget lunar.
 - Toate calculele (spam scoring, audit SEO, canibalizare, link map, corelare Ads ↔ apeluri) sunt SQL + PHP.
 
-### 3.4 Coada de joburi (shared hosting)
-`jobs` (MySQL) + `bin/cron.php` rulat la 1–5 minute (sau `GET /cron/run` cu token pentru gazde fără CLI). Rezervare atomică prin `UPDATE ... WHERE status='pending' ... LIMIT 1` cu token unic, buget de timp per rulare, `cursor_state` pentru procesare incrementală, retry cu backoff, deduplicare prin `unique_key`.
+### 3.4 Coada de joburi și cron-ul web (fără cPanel)
+`jobs` (MySQL) procesată de `Services\Cron_Runner`, declanșat **automat**, ca WP-Cron: după fiecare request (pagini, AJAX, heartbeat-urile și evenimentele pluginurilor), `Services\Web_Cron` revendică atomic un tick (cel mult unul pe interval, implicit 1 minut) și trimite un POST loopback non-blocant la `/cron/spawn`, autentificat cu un secret generat automat și stocat criptat. Dacă gazda blochează loopback-ul, tick-ul rulează după răspuns (`fastcgi_finish_request`) sau din browserul unui utilizator autentificat (`/cron/tick`). Nu există cron cPanel și nici token în `config.php`; `bin/cron.php` rămâne doar pentru dezvoltare. Rezervare atomică prin `UPDATE ... WHERE status='pending' ... LIMIT 1` cu token unic, buget de timp per rulare, `cursor_state` pentru procesare incrementală, retry cu backoff, deduplicare prin `unique_key`.
 
 ## 4. Instalare
 
 ### 4.1 Local (Laragon)
 1. Copiați `config/config.sample.php` în `config/config.php`.
 2. Generați cheile: `php bin/generate-key.php` și copiați valorile în `config.php`.
-3. Creați baza de date și importați schema:
+3. Creați baza de date (goală). La primul request, `Migrator` importă automat `schema.sql`; manual:
    ```bash
    mysql -uroot -e "CREATE DATABASE optivio CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
    mysql -uroot optivio < schema.sql
@@ -105,14 +108,15 @@ Apache/LiteSpeed → public/index.php → app/bootstrap.php
 ### 4.2 Producție (cPanel, `optivio.ahoi.ro`)
 1. Încărcați proiectul în afara `public_html` (ex. `/home/user/optivio`).
 2. Setați **Document Root** al subdomeniului pe `/home/user/optivio/public`. (Dacă nu se poate, rădăcina conține `.htaccess` care rescrie totul în `public/` și blochează restul.)
-3. Creați baza de date din cPanel, importați `schema.sql` din phpMyAdmin. **La actualizarea unei instalări existente** rulați în ordine fișierele din `database/upgrades/` mai noi decât versiunea din tabelul `schema_migrations`.
+3. Creați baza de date din cPanel (o bază goală se instalează automat din `schema.sql` la primul request; alternativ importați `schema.sql` din phpMyAdmin).
 4. Configurați `config/config.php` (`app_env = production`, `app_url = https://optivio.ahoi.ro`, `force_https = true`).
-5. Cron Job cPanel (la fiecare 5 minute):
-   ```
-   */5 * * * * /usr/local/bin/php /home/user/optivio/bin/cron.php >/dev/null 2>&1
-   ```
-   Alternativ: `wget -qO- "https://optivio.ahoi.ro/cron/run?token=CRON_TOKEN"`.
+5. **Nu este nevoie de Cron Job în cPanel**: joburile rulează prin cron-ul web automat (secțiunea 3.4).
 6. Permisiuni: `storage/` scriibil de PHP (755/775), `config/config.php` 640.
+
+### 4.3 Actualizare (deploy din GitHub)
+1. Încărcați fișierele noi peste cele existente (fără `config/config.php` și fără `storage/`).
+2. Deschideți aplicația. La primul request, `Core\Migrator` compară `OPTIVIO_SCHEMA_VERSION` cu `schema_migrations` și aplică în ordine `database/upgrades/<versiune>.sql` lipsă, sub `GET_LOCK` (un singur request migrează, celelalte așteaptă). Instrucțiunile deja aplicate (coloană / cheie / tabel existent) sunt sărite, deci un upgrade întrerupt se reia. Un fișier marker `storage/cache/schema-<versiune>.ok` face verificarea gratuită ulterior.
+3. Setările noi au valori implicite (`Settings_Repository::DEFAULTS`); secretele noi se generează automat. Nu se modifică `config.php` și nu se rulează niciun script.
 
 ## 5. Plan de implementare pe etape
 
@@ -125,13 +129,15 @@ Apache/LiteSpeed → public/index.php → app/bootstrap.php
 | **5. Integrări Google** | OAuth 2.0 cu PKCE (mai multe conturi Google, refresh token criptat, revocare), descoperirea proprietăților, asociere cont + proprietate per site, joburi incrementale reluabile: GSC (dată × interogare × pagină), GA4 (dată × pagină × sursă/mediu), PageSpeed, GTM (snapshot versiune live), Google Ads (campanii, cuvinte cheie, negative, orar, termeni de căutare), AdSense, Business Profile; pagină „Date Google” per site; mod mock pentru development | ✅ Implementat |
 | **6. Motor determinist** | Audit SEO (22 de reguli on-page, tehnice, PageSpeed, GTM) cu rezolvare automată, canibalizare, „aproape de top 3”, CTR mic la poziție bună, plătim deși suntem top organic, termeni care convertesc în Ads fără pagină SEO, termeni plătiți fără rezultat, cuvinte cu apeluri refuzate, ore proaste (Ad Schedule), cercetare cuvinte cheie (GSC + Ads + servicii × zonă + SERP) cu intenție și prioritate pe model de afacere, consilier strategie Ads, concurență (Serper + manual, scanner PHP anti-SSRF, comparație termeni/H2/lungime/schema) | ✅ Implementat |
 | **7. AI on-demand & Action Cards** | Client OpenRouter (3 profiluri), analiză profundă multi-sursă, Action Cards (aprobare/editare/respingere → regulă permanentă), prompturi imagini + upload, aplicare prin plugin, 1-click rollback | ✅ Implementat |
+| **8. Onboarding & percepție** | Wizard în 7 pași (Super Admin): descoperire pagini (robots, sitemap, meniu) și citire în fundal (max. 50/site, 100/analiză), percepția AI din exterior (profil `perception`, Gemini Flash recomandat) salvată imuabil ca amprentă inițială, confirmare câmp cu câmp, diferențe percepție vs realitate + scor de claritate + Action Cards deterministe, plugin și Google în wizard, tab „Percepție” (re-analiză din exterior, percepție din interior per site după plugin), ștergere definitivă a afacerilor | ✅ Implementat |
+| **9. Operare fără efort** | Cron web automat fără cPanel, migrări automate ale bazei de date la deploy, „Testează conexiunea” pentru fiecare cheie/API, backup Google Drive (bază de date + fișiere, programat, ultimele 1–30 de copii, copie locală opțională, descărcare SQL) | ✅ Implementat |
 
 ## 5b. Pluginul OptiVio Connector
 1. OptiVio → Afacere → Site-uri → site WordPress → **Descarcă pluginul (.zip)** (conține `connection.php` cu URL-ul OptiVio, Key ID și secretul site-ului).
 2. WordPress → Plugins → Add New → Upload → activare. Pluginul face imediat heartbeat-ul și pornește sincronizarea completă a conținutului.
 3. WordPress → Settings → OptiVio Connector: stare, „Testează conexiunea", „Sincronizare completă", „Trimite coada acum", suprascriere conexiune (după rotirea secretului).
 4. În OptiVio: pagina site-ului → **Testează conexiunea OptiVio → WordPress**, **Conținut & SEO** (metrici on-page, editor Yoast cu „Aplică pe site") și **Istoric modificări** (rollback).
-5. Pluginul folosește WP-Cron (heartbeat orar, coadă la 5 minute, sincronizare zilnică). Pe site-uri cu trafic mic se recomandă un cron real: `*/5 * * * * wget -qO- https://site.ro/wp-cron.php >/dev/null`.
+5. Pluginul folosește WP-Cron-ul standard (heartbeat orar, coadă la 5 minute, sincronizare zilnică) — nu se configurează nimic în hosting. Cererile lui declanșează și cron-ul web al OptiVio.
 
 ## 5c. Configurare Google
 1. Google Cloud Console → proiect → activați API-urile: Search Console, Google Analytics Data + Admin, PageSpeed Insights, Tag Manager, Google Ads, AdSense Management, Business Profile Performance + Account Management + Business Information.
@@ -142,21 +148,33 @@ Apache/LiteSpeed → public/index.php → app/bootstrap.php
 6. Development: `'google_mock' => true` în config (doar cu `app_env = development`) servește răspunsuri simulate pentru toate API-urile.
 
 ## 5d. AI & Action Cards
-1. Setări → AI: cheia OpenRouter globală (sau per client în tab-ul „AI & conectori”), modelele celor 3 profiluri, bugetul lunar și „Confirmare înainte de fiecare apel”.
+1. Setări → AI: cheia OpenRouter globală (sau per client în tab-ul „AI & conectori”), modelele celor 4 profiluri (rapid, raționament, copywriting, percepție), bugetul lunar, „Confirmare înainte de fiecare apel” și limitele de onboarding.
 2. **Analize AI** → „Pregătește o analiză nouă”: se afișează modelul, dimensiunea snapshot-ului determinist (fără date personale), costul maxim estimat și bugetul; după confirmare, modelul „Raționament” întoarce un diagnostic + Action Cards. Cardurile invalide (categorie necunoscută, conținut/site al altei afaceri, câmpuri lipsă) sunt eliminate.
 3. **Action Cards**: fiecare card are justificare, propunere editabilă și decizie: *Aprobă și aplică pe site* (SEO meta, conținut, link intern, articol/landing nou — prin pluginul conectat, cu snapshot), *Marchează ca aplicat manual* (Google Ads, Business Profile, tehnic) sau *Respinge* (motivul devine regulă permanentă a afacerii, transmisă tuturor analizelor viitoare). Cardurile aplicate pe site au *Rollback 1-click*.
 4. Articole / landing-uri noi: pentru fiecare imagine planificată se afișează promptul (pentru un generator de imagini) și ALT-ul; imaginea încărcată (JPEG/PNG/WebP ≤ 8 MB) se urcă în Media Library la aplicare (imagine reprezentativă sau în conținut). Pagina se creează ca ciornă sau publicată, după alegere.
 5. Development: `'ai_mock' => true` în config (doar cu `app_env = development`) simulează răspunsurile OpenRouter.
 
 ## 5e. Ajutor și ghiduri de integrare
-- Meniul **Suport → Ajutor** (`/help`, toți utilizatorii autentificați): configurarea inițială, adăugarea unei afaceri pas cu pas, instalarea pluginului, integrările Google, accesul operatorilor, fluxul zilnic/săptămânal, descrierea fiecărui meniu, ghidurile de integrare și probleme frecvente.
+- Meniul **Suport → Ajutor** (`/help`, toți utilizatorii autentificați): configurarea inițială, wizard-ul de onboarding, percepție vs realitate, instalarea pluginului, integrările Google, accesul operatorilor, fluxul zilnic/săptămânal, backup / cron / actualizări, descrierea fiecărui meniu, ghidurile de integrare și probleme frecvente.
 - Butoanele „Cum configurez?” / „?” din Setări → Integrări & chei API, Setări → AI, tab-ul AI & conectori al afacerii și cardul Integrări Google al site-ului deschid un pop-up cu linkul direct către consola furnizorului și pașii de activare.
+
+## 5f. Onboarding (wizard) și percepția AI
+1. **Afaceri → Afacere nouă (wizard)** (`/onboarding`, Super Admin): domeniile clientului → `Onboarding\Page_Discovery` (robots.txt, sitemap / sitemap index / wp-sitemap, meniul paginii principale; aceeași gazdă) → selecție (implicit fără pagini legale, max. 5 articole) → citire în fundal (`onboarding.fetch` + AJAX, `Safe_Fetcher`, `Page_Extractor`: text vizibil pe linii, titluri, telefoane, emailuri, CUI/Reg. Com., prețuri, program, JSON-LD).
+2. **Percepția AI** (`Onboarding\Perception`): header/footer comun trimis o singură dată, pagini prioritizate și trunchiate la `onboarding.max_input_chars`, un apel `Ai_Client::complete_json()` profil `perception`, răspuns validat câmp cu câmp, salvat imuabil în `business_perceptions` (cu faptele deterministe).
+3. **Confirmare**: afacerea se creează doar aici (site-uri cu cheie conector, servicii, decizii în `businesses.onboarding_state`); `Perception_Gaps` calculează diferențele, scorul de claritate și cardurile (`hash_key = gap:{câmp}:{Text::key}`).
+4. Pașii 4–7: USP/reguli/contact, plugin per site (stare live), Google, rezumat + `Engine_Runner::run()`.
+5. Tab **Percepție**: istoric, comparație cu amprenta inițială, „Percepție din interior” per site (doar după plugin + conținut sincronizat), „Re-analizează din exterior”.
+6. **Ștergere definitivă** (Super Admin): `/businesses/{id}/delete` cu sumarul datelor, confirmarea numelui și a parolei; `Services\Business_Deleter` (cascade FK, joburi, notificări, fișiere upload; costurile AI și auditul rămân).
+
+## 5g. Backup Google Drive, teste de conexiune
+- **Administrare → Backup Google Drive** (`/backup`): conectare Drive cu scope `drive.file` prin clientul OAuth existent și același redirect URI; bază de date (`.sql.gz`, export PHP pur) și fișiere (`.zip`, „Recomandat” = uploads + config sau „Complet”), periodicitate (zilnic, de 2 ori/săptămână, săptămânal, lunar) la ora aleasă, păstrare ultimele 1/2/3/5/10/15/21/30 per tip, copie locală opțională în `storage/backups`, descărcare SQL în browser, jurnal în tabelul `backups`. Rulează ca job `backup.run` prin cron-ul web.
+- **Setări → Integrări → Testează conexiunea** (`Services\Connection_Tester`): OpenRouter (starea cheii, fără apel de model), Serper (1 credit), PageSpeed, client Google OAuth + conturile conectate, developer token Ads, Google Drive.
 
 ## 6. Comenzi utile
 ```bash
-php bin/generate-key.php        # chei master / install / cron
+php bin/generate-key.php        # master_key + install_token
 php bin/install.php --email=admin@exemplu.ro --name="Admin"
-php bin/cron.php                # rulează coada de joburi
+php bin/cron.php                # rulează coada manual (doar dezvoltare; în producție cron-ul e automat)
 php bin/seed-demo.php           # date demo pentru dashboard
 php bin/connector-simulate.php --site=ID --replay   # trimite evenimente semnate ca pluginul (doar development)
 vendor/bin/phpcs                # verificare WPCS (dacă phpcs este instalat global/composer)

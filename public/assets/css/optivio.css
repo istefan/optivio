@@ -319,3 +319,44 @@ a { text-decoration: none; }
 .ov-help-menu dt { font-weight: 600; margin-top: .75rem; }
 .ov-help-menu dd { color: #4b5563; margin-bottom: 0; }
 .ov-kbd { font-family: var(--bs-font-monospace); font-size: .8rem; background: #f4f6f8; border: 1px solid #e5e7eb; border-radius: 6px; padding: 1px 6px; }
+
+/* Onboarding wizard (Stage 8) */
+.ov-stepper { display: flex; gap: 4px; padding: 4px; margin: 0; background: #eceef1; border-radius: 12px; overflow-x: auto; list-style: none; }
+.ov-stepper-item { flex: 1 1 0; min-width: 130px; display: flex; align-items: center; gap: .5rem; padding: .4rem .7rem; border-radius: 9px; font-size: .8rem; color: var(--ov-ink-2); white-space: nowrap; }
+.ov-stepper-item a { display: flex; align-items: center; gap: .5rem; width: 100%; color: inherit; }
+.ov-stepper-item a:hover { color: var(--ov-ink); }
+.ov-stepper-item.is-current { background: #fff; color: var(--ov-ink); box-shadow: var(--ov-shadow); font-weight: 600; }
+.ov-stepper-item.is-todo { opacity: .6; }
+.ov-stepper-dot { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: .72rem; flex: 0 0 auto; background: #fff; border: 1.5px solid #d1d5db; color: var(--ov-ink-2); }
+.ov-stepper-item.is-current .ov-stepper-dot,
+.ov-stepper-item.is-done .ov-stepper-dot { background: #111827; border-color: #111827; color: #fff; }
+.ov-page-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px; }
+.ov-page-item { display: flex; align-items: center; gap: .6rem; padding: .45rem .6rem; border: 1px solid #eef0f3; border-radius: 10px; cursor: pointer; min-width: 0; }
+.ov-page-item:hover { border-color: #d1d5db; }
+.ov-page-item .form-check-input { margin: 0; flex: 0 0 auto; }
+.ov-ai-note { margin-top: .35rem; padding: .4rem .6rem; border-radius: 8px; background: #f6f7f9; font-size: .8rem; color: var(--ov-ink-2); }
+.ov-ai-note.is-missing { background: #fff7ed; color: #9a3412; }
+.ov-verdict { display: flex; flex-wrap: wrap; gap: .9rem; margin-top: .35rem; font-size: .8rem; }
+.ov-verdict label { display: inline-flex; align-items: center; gap: .3rem; cursor: pointer; }
+.ov-svc-row { display: flex; gap: .7rem; padding: .55rem 0; border-bottom: 1px solid #f1f2f4; }
+.ov-svc-row:last-of-type { border-bottom: 0; }
+.ov-pillar { display: flex; gap: .55rem; align-items: flex-start; padding: .45rem .6rem; border: 1px solid #eef0f3; border-radius: 10px; width: 100%; cursor: pointer; font-size: .85rem; }
+.ov-pillar .form-check-input { margin-top: .15rem; flex: 0 0 auto; }
+.ov-clarity { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; min-width: 76px; padding: .35rem .6rem; border-radius: 12px; background: #111827; color: #fff; font-size: 1.25rem; font-weight: 700; line-height: 1.1; }
+.ov-clarity small { font-size: .62rem; font-weight: 500; opacity: .75; text-transform: uppercase; letter-spacing: .04em; }
+.ov-site-perception { padding: .7rem 0; border-bottom: 1px solid #f1f2f4; }
+.ov-site-perception:last-child { border-bottom: 0; padding-bottom: 0; }
+.ov-danger-zone { border: 1px solid #fecaca; }
+
+/* Connection tests, backup page */
+.ov-test { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.ov-test-result { font-size: .8rem; color: var(--ov-ink-2); }
+.ov-test-result:empty { display: none; }
+.ov-test-result.is-ok { color: #15803d; }
+.ov-test-result.is-error { color: #b91c1c; }
+.ov-test-result.is-running { color: var(--ov-ink-2); font-style: italic; }
+.ov-stat-box { border: 1px solid #eef0f3; border-radius: 10px; padding: .6rem .75rem; font-size: .85rem; height: 100%; }
+.ov-choice { display: flex; gap: .6rem; align-items: flex-start; padding: .65rem .8rem; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; font-size: .85rem; width: 100%; }
+.ov-choice input { margin-top: .2rem; accent-color: #111827; }
+.ov-choice:has(input:checked) { border: 2px solid #111827; padding: calc(.65rem - 1px) calc(.8rem - 1px); }
+.form-switch .form-check-input:checked { background-color: #111827; border-color: #111827; }

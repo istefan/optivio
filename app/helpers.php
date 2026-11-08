@@ -539,3 +539,18 @@ function ov_help_text( string $text ): string {
 	$html = (string) preg_replace( '/\*\*(.+?)\*\*/', '<strong>$1</strong>', $html );
 	return (string) preg_replace( '/`(.+?)`/', '<span class="ov-kbd">$1</span>', $html );
 }
+
+/**
+ * Prints a "Testează conexiunea" button and its live result area (AJAX, Super Admin).
+ *
+ * @param string $provider Provider key (OptiVio\Services\Connection_Tester::PROVIDERS).
+ * @param string $label    Button label.
+ * @return void
+ */
+function ov_test_button( string $provider, string $label = 'Testează conexiunea' ): void {
+	$url = ov_url( '/settings/test/' . $provider );
+	echo '<span class="ov-test">'
+		. '<button class="btn btn-sm btn-light" type="button" data-ov-test="' . esc_url( $url ) . '"><i class="bi bi-plug me-1" aria-hidden="true"></i>' . esc_html( $label ) . '</button>'
+		. '<span class="ov-test-result" data-ov-test-result="' . esc_url( $url ) . '" aria-live="polite"></span>'
+		. '</span>';
+}

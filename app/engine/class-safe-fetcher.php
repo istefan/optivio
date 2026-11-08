@@ -6,7 +6,9 @@
  * - DNS resolved once, every IP must be public (no private / loopback / link-local / reserved),
  *   and the connection is pinned to the validated IP (CURLOPT_RESOLVE) against DNS rebinding;
  * - redirects followed manually (max 3), each hop re-validated;
- * - HTML only, 2 MB max, 15 s timeout.
+ * - HTML only by default (XML / plain text on request, for sitemaps and robots.txt), 2 MB max, 15 s timeout;
+ * - in `development` only, the `allow_local` option permits loopback / private hosts and any port
+ *   (local test sites such as http://127.0.0.1:8091); it is ignored in production.
  *
  * @package   OptiVio
  * @author    Stefan Iftimie, founder Ahoi Digital SRL <https://www.ahoi.ro/>
@@ -16,6 +18,8 @@
 declare( strict_types = 1 );
 
 namespace OptiVio\Engine;
+
+use OptiVio\Core\Config;
 
 defined( 'OPTIVIO_ROOT' ) || exit;
 
@@ -29,12 +33,21 @@ final class Safe_Fetcher {
 	/**
 	 * Fetches a URL.
 	 *
-	 * @param string $url URL.
+	 * @param string $url  URL.
+	 * @param array  $opts accept: html|xml|text (default html); allow_local: bool (development only).
 	 * @return array{ok:bool,status:int,url:string,html:string,error:string}
 	 */
-	public static function get( string $url ): array {
+	public static function get( string $url, array $opts = array() ): array {
+		$accept = (string) ( $opts['accept'] ?? 'html' );
+		$local  = ! empty( $opts['allow_local'] ) && Config::is_dev();
+		$types  = array(
+			'html' => array( '#text/html|application/xhtml#i', 'text/html,application/xhtml+xml', 'Conținutul nu este HTML.' ),
+			'xml'  => array( '#xml#i', 'application/xml,text/xml', 'Conținutul nu este XML.' ),
+			'text' => array( '#text/plain#i', 'text/plain', 'Conținutul nu este text.' ),
+		);
+		$type_rule = $types[ $accept ] ?? $types['html'];
 		for ( $hop = 0; $hop <= 3; $hop++ ) {
-			$target = self::validate( $url );
+			$target = self::validate( $url, $local );
 			if ( null === $target ) {
 				return self::fail( $url, 'URL nepermis (doar adrese publice http/https).' );
 			}
@@ -52,7 +65,7 @@ final class Safe_Fetcher {
 					CURLOPT_CONNECTTIMEOUT => 8,
 					CURLOPT_HEADER         => false,
 					CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; OptiVioBot/1.0; +https://optivio.ahoi.ro)',
-					CURLOPT_HTTPHEADER     => array( 'Accept: text/html,application/xhtml+xml', 'Accept-Language: ro-RO,ro;q=0.9,en;q=0.5' ),
+					CURLOPT_HTTPHEADER     => array( 'Accept: ' . $type_rule[1], 'Accept-Language: ro-RO,ro;q=0.9,en;q=0.5' ),
 					CURLOPT_ENCODING       => '',
 					CURLOPT_WRITEFUNCTION  => static function ( $handle, string $chunk ) use ( &$body, &$too_big ): int {
 						unset( $handle );
@@ -78,8 +91,8 @@ final class Safe_Fetcher {
 			if ( '' !== $error && ! $too_big ) {
 				return self::fail( $url, $error, $status );
 			}
-			if ( '' !== $type && ! preg_match( '#text/html|application/xhtml#i', $type ) ) {
-				return self::fail( $url, 'Conținutul nu este HTML.', $status );
+			if ( '' !== $type && ! preg_match( $type_rule[0], $type ) && $status >= 200 && $status < 300 ) {
+				return self::fail( $url, $type_rule[2], $status );
 			}
 			return array(
 				'ok'     => $status >= 200 && $status < 300,
@@ -95,10 +108,11 @@ final class Safe_Fetcher {
 	/**
 	 * Validates a URL and resolves it to a public IP.
 	 *
-	 * @param string $url URL.
+	 * @param string $url         URL.
+	 * @param bool   $allow_local Allow loopback / private hosts and any port (callers pass true only in development).
 	 * @return array{host:string,port:int,ip:string}|null
 	 */
-	public static function validate( string $url ): ?array {
+	public static function validate( string $url, bool $allow_local = false ): ?array {
 		$p = parse_url( $url ); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
 		if ( ! is_array( $p ) || empty( $p['host'] ) || isset( $p['user'] ) || isset( $p['pass'] ) ) {
 			return null;
@@ -108,7 +122,7 @@ final class Safe_Fetcher {
 			return null;
 		}
 		$port = (int) ( $p['port'] ?? ( 'https' === $scheme ? 443 : 80 ) );
-		if ( ! in_array( $port, array( 80, 443, 8080, 8443 ), true ) ) {
+		if ( ! $allow_local && ! in_array( $port, array( 80, 443, 8080, 8443 ), true ) ) {
 			return null;
 		}
 		$host = strtolower( trim( (string) $p['host'], '[]' ) );
@@ -117,7 +131,7 @@ final class Safe_Fetcher {
 			return null;
 		}
 		foreach ( $ips as $ip ) {
-			if ( false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
+			if ( ! $allow_local && false === filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
 				return null;
 			}
 		}

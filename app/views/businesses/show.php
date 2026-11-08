@@ -129,5 +129,23 @@ $ov_conn  = array(
 				</ul>
 			<?php endif; ?>
 		</div>
+
+		<?php
+		$ov_onb = (array) ( json_decode( (string) ( $ov_b['onboarding_state'] ?? '' ), true ) ?: array() );
+		?>
+		<?php if ( ! empty( $view['is_super_admin'] ) && ! empty( $ov_onb['draft_id'] ) && empty( $ov_onb['completed_at'] ) ) : ?>
+			<div class="ov-alert ov-alert-warning mb-0">
+				<i class="bi bi-magic" aria-hidden="true"></i>
+				<div>Onboarding-ul nu este finalizat. <a href="<?php echo esc_url( ov_url( '/onboarding/' . (int) $ov_onb['draft_id'] ) ); ?>">Continuă wizard-ul</a></div>
+			</div>
+		<?php endif; ?>
+
+		<?php if ( ! empty( $view['is_super_admin'] ) ) : ?>
+			<div class="ov-card ov-danger-zone">
+				<div class="ov-card-header"><h2 class="ov-card-title">Zonă periculoasă</h2></div>
+				<p class="ov-cell-sub">Ștergerea elimină definitiv afacerea și toate datele ei. Pentru o pauză, folosiți starea „Arhivată” din Profil.</p>
+				<a class="btn btn-outline-danger btn-sm" href="<?php echo esc_url( ov_url( '/businesses/' . (int) $ov_b['id'] . '/delete' ) ); ?>"><i class="bi bi-trash me-1" aria-hidden="true"></i>Șterge definitiv</a>
+			</div>
+		<?php endif; ?>
 	</div>
 </div>

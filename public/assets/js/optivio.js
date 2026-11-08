@@ -46,6 +46,80 @@
 		}
 	} );
 
+	// Web cron fallback (host blocks loopback requests): the browser starts the due tick in the background.
+	var cronTick = document.querySelector( 'meta[name="ov-cron-tick"]' );
+	if ( cronTick ) {
+		fetch( cronTick.getAttribute( 'content' ), {
+			method: 'POST',
+			credentials: 'same-origin',
+			keepalive: true,
+			headers: { 'X-CSRF-Token': csrfToken(), 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }
+		} ).catch( function () {} );
+	}
+
+	// "Testează conexiunea": POST to the tester and show the answer next to the button.
+	document.addEventListener( 'click', function ( event ) {
+		var btn = event.target.closest( '[data-ov-test]' );
+		if ( ! btn ) {
+			return;
+		}
+		var url = btn.getAttribute( 'data-ov-test' );
+		var out = document.querySelector( '[data-ov-test-result="' + url + '"]' );
+		btn.disabled = true;
+		if ( out ) {
+			out.className = 'ov-test-result is-running';
+			out.textContent = 'Se testează…';
+		}
+		fetch( url, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'X-CSRF-Token': csrfToken(), 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }
+		} )
+			.then( function ( r ) {
+				return r.json();
+			} )
+			.then( function ( res ) {
+				if ( out ) {
+					out.className = 'ov-test-result ' + ( res.ok ? 'is-ok' : 'is-error' );
+					out.textContent = ( res.ok ? '✓ ' : '✕ ' ) + ( res.message || '' ) + ( res.ms ? ' (' + res.ms + ' ms)' : '' );
+				}
+			} )
+			.catch( function () {
+				if ( out ) {
+					out.className = 'ov-test-result is-error';
+					out.textContent = '✕ Testul nu a putut fi rulat.';
+				}
+			} )
+			.then( function () {
+				btn.disabled = false;
+			} );
+	} );
+
+	// Backup page: reload when the running backups are finished.
+	var backupBox = document.getElementById( 'ov-backup-running' );
+	if ( backupBox ) {
+		var backupPoll = function () {
+			fetch( backupBox.getAttribute( 'data-endpoint' ), {
+				credentials: 'same-origin',
+				headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }
+			} )
+				.then( function ( r ) {
+					return r.json();
+				} )
+				.then( function ( res ) {
+					if ( 0 === res.running ) {
+						window.location.reload();
+					} else {
+						window.setTimeout( backupPoll, 4000 );
+					}
+				} )
+				.catch( function () {
+					window.setTimeout( backupPoll, 10000 );
+				} );
+		};
+		window.setTimeout( backupPoll, 3000 );
+	}
+
 	// Help page: open the integration guide targeted by the URL hash (#ghid-...).
 	if ( window.location.hash.indexOf( '#ghid-' ) === 0 && window.bootstrap ) {
 		var guide = document.getElementById( window.location.hash.slice( 1 ) );
@@ -149,6 +223,134 @@
 			};
 			tick();
 		} );
+	}
+
+	/* ------------------------------------------------------------------ *
+	 * Onboarding wizard
+	 * ------------------------------------------------------------------ */
+
+	// Step 1: live counters of the selected pages (per site and total).
+	var pagesForm = document.getElementById( 'ov-pages-form' );
+	if ( pagesForm ) {
+		var maxSite = parseInt( pagesForm.getAttribute( 'data-max-site' ), 10 ) || 50;
+		var maxRun = parseInt( pagesForm.getAttribute( 'data-max-run' ), 10 ) || 100;
+		var countPages = function () {
+			var total = 0;
+			pagesForm.querySelectorAll( '[data-ov-site]' ).forEach( function ( card ) {
+				var n = card.querySelectorAll( 'input[name="page[]"]:checked' ).length;
+				var out = card.querySelector( '[data-ov-site-count]' );
+				total += n;
+				if ( out ) {
+					out.textContent = n + ' / ' + maxSite;
+					out.classList.toggle( 'text-danger', n > maxSite );
+				}
+			} );
+			var totalOut = document.getElementById( 'ov-pages-total' );
+			if ( totalOut ) {
+				totalOut.textContent = total;
+				totalOut.classList.toggle( 'text-danger', total > maxRun || 0 === total );
+			}
+		};
+		pagesForm.addEventListener( 'change', countPages );
+		countPages();
+	}
+
+	// Step 1b: fetch the pages in batches (AJAX) and show the progress.
+	var fetchBox = document.getElementById( 'ov-fetch' );
+	if ( fetchBox && '1' === fetchBox.getAttribute( 'data-running' ) ) {
+		var fetchLabels = { pending: 'în așteptare', fetching: 'se citește', ok: 'citită', error: 'eroare', skipped: 'blocată' };
+		var fetchClasses = { pending: '', fetching: 'ov-badge-warning', ok: 'ov-badge-success', error: 'ov-badge-danger', skipped: 'ov-badge-outline' };
+		var fetchTick = function () {
+			fetch( fetchBox.getAttribute( 'data-endpoint' ), {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'X-CSRF-Token': csrfToken(), 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }
+			} )
+				.then( function ( r ) {
+					if ( ! r.ok ) {
+						throw new Error( 'HTTP ' + r.status );
+					}
+					return r.json();
+				} )
+				.then( function ( payload ) {
+					var p = payload.progress;
+					document.getElementById( 'ov-fetch-done' ).textContent = p.done;
+					document.getElementById( 'ov-fetch-errors' ).textContent = p.error;
+					document.getElementById( 'ov-fetch-bar' ).style.width = p.percent + '%';
+					payload.pages.forEach( function ( page ) {
+						var row = document.querySelector( '[data-ov-page="' + page.id + '"]' );
+						if ( ! row ) {
+							return;
+						}
+						var badge = row.querySelector( '[data-ov-status]' );
+						badge.className = 'ov-badge ' + ( fetchClasses[ page.status ] || '' );
+						badge.textContent = fetchLabels[ page.status ] || page.status;
+						row.querySelector( '[data-ov-error]' ).textContent = page.error || '';
+						row.querySelector( '[data-ov-chars]' ).textContent = formatNumber( page.chars );
+					} );
+					if ( payload.done ) {
+						var next = document.getElementById( 'ov-fetch-next' );
+						next.classList.remove( 'disabled' );
+						next.removeAttribute( 'aria-disabled' );
+						next.removeAttribute( 'tabindex' );
+					} else {
+						window.setTimeout( fetchTick, 300 );
+					}
+				} )
+				.catch( function () {
+					window.setTimeout( fetchTick, 5000 );
+				} );
+		};
+		fetchTick();
+	}
+
+	// Step 5: live connector status of every site.
+	var connBox = document.getElementById( 'ov-connectors' );
+	if ( connBox ) {
+		var connLabels = {};
+		try {
+			connLabels = JSON.parse( connBox.getAttribute( 'data-labels' ) || '{}' );
+		} catch ( e ) {
+			connLabels = {};
+		}
+		var connClasses = { not_installed: '', pending: 'ov-badge-warning', connected: 'ov-badge-success', error: 'ov-badge-danger', revoked: 'ov-badge-danger' };
+		var connTick = function () {
+			if ( document.hidden ) {
+				window.setTimeout( connTick, 5000 );
+				return;
+			}
+			fetch( connBox.getAttribute( 'data-endpoint' ), {
+				credentials: 'same-origin',
+				headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }
+			} )
+				.then( function ( r ) {
+					return r.json();
+				} )
+				.then( function ( payload ) {
+					payload.sites.forEach( function ( site ) {
+						var card = connBox.querySelector( '[data-ov-site-id="' + site.id + '"]' );
+						if ( ! card ) {
+							return;
+						}
+						var badge = card.querySelector( '[data-ov-conn]' );
+						badge.className = 'ov-badge ' + ( connClasses[ site.connector_status ] || '' );
+						badge.textContent = connLabels[ site.connector_status ] || site.connector_status;
+						var content = card.querySelector( '[data-ov-content]' );
+						if ( content ) {
+							content.textContent = site.content_count;
+						}
+						var version = card.querySelector( '[data-ov-version]' );
+						if ( version ) {
+							version.textContent = site.plugin_version || '—';
+						}
+					} );
+					window.setTimeout( connTick, 5000 );
+				} )
+				.catch( function () {
+					window.setTimeout( connTick, 15000 );
+				} );
+		};
+		window.setTimeout( connTick, 3000 );
 	}
 
 	/* ------------------------------------------------------------------ *

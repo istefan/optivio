@@ -18,6 +18,7 @@ use OptiVio\Controllers\Actions_Controller;
 use OptiVio\Controllers\Analyses_Controller;
 use OptiVio\Controllers\Audit_Controller;
 use OptiVio\Controllers\Auth_Controller;
+use OptiVio\Controllers\Backup_Controller;
 use OptiVio\Controllers\Business_Ai_Controller;
 use OptiVio\Controllers\Business_Children_Controller;
 use OptiVio\Controllers\Business_Usp_Controller;
@@ -25,6 +26,8 @@ use OptiVio\Controllers\Calls_Controller;
 use OptiVio\Controllers\Form_Entries_Controller;
 use OptiVio\Controllers\Google_Controller;
 use OptiVio\Controllers\Help_Controller;
+use OptiVio\Controllers\Onboarding_Controller;
+use OptiVio\Controllers\Perception_Controller;
 use OptiVio\Controllers\Businesses_Controller;
 use OptiVio\Controllers\Site_Connector_Controller;
 use OptiVio\Controllers\Sites_Controller;
@@ -55,16 +58,18 @@ return static function ( Router $r ): void {
 	$r->add( 'GET', '/setup', array( Setup_Controller::class, 'show' ), $guest );
 	$r->add( 'POST', '/setup', array( Setup_Controller::class, 'store' ), $guest );
 
-	// Machine endpoint: token protected, no session/CSRF.
+	// Web cron (no cPanel): loopback endpoint authenticated by an automatic secret header, no session/CSRF.
 	$r->add(
-		'GET',
-		'/cron/run',
-		array( Cron_Controller::class, 'run_http' ),
+		'POST',
+		'/cron/spawn',
+		array( Cron_Controller::class, 'spawn' ),
 		array(
 			'auth' => false,
 			'csrf' => false,
 		)
 	);
+	// Browser fallback for hosts that block loopback requests.
+	$r->add( 'POST', '/cron/tick', array( Cron_Controller::class, 'tick' ) );
 
 	// OptiVio Connector machine API: HMAC signed, stateless (no session/CSRF).
 	$machine = array(
@@ -100,8 +105,37 @@ return static function ( Router $r ): void {
 	$r->add( 'GET', '/businesses/new', array( Businesses_Controller::class, 'create' ), $admin );
 	$r->add( 'POST', '/businesses', array( Businesses_Controller::class, 'store' ), $admin );
 	$r->add( 'GET', '/businesses/{id}', array( Businesses_Controller::class, 'show' ) );
+	$r->add( 'GET', '/businesses/{id}/delete', array( Businesses_Controller::class, 'confirm_delete' ), $admin );
+	$r->add( 'POST', '/businesses/{id}/delete', array( Businesses_Controller::class, 'destroy' ), $admin );
 	$r->add( 'GET', '/businesses/{id}/edit', array( Businesses_Controller::class, 'edit' ) );
 	$r->add( 'POST', '/businesses/{id}', array( Businesses_Controller::class, 'update' ) );
+
+	// Onboarding wizard + perception (Stage 8). The wizard is super admin only.
+	$r->add( 'GET', '/onboarding', array( Onboarding_Controller::class, 'index' ), $admin );
+	$r->add( 'POST', '/onboarding', array( Onboarding_Controller::class, 'start' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}', array( Onboarding_Controller::class, 'resume' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/delete', array( Onboarding_Controller::class, 'destroy' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}/pages', array( Onboarding_Controller::class, 'pages' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/pages', array( Onboarding_Controller::class, 'save_pages' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/pages/{page_id}/retry', array( Onboarding_Controller::class, 'page_retry' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/pages/{page_id}/exclude', array( Onboarding_Controller::class, 'page_exclude' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}/fetch', array( Onboarding_Controller::class, 'fetch_view' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/fetch', array( Onboarding_Controller::class, 'fetch_step' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}/analyze', array( Onboarding_Controller::class, 'analyze_view' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/analyze', array( Onboarding_Controller::class, 'analyze' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}/confirm', array( Onboarding_Controller::class, 'confirm_view' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/confirm', array( Onboarding_Controller::class, 'confirm' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}/commercial', array( Onboarding_Controller::class, 'commercial_view' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/commercial', array( Onboarding_Controller::class, 'commercial' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}/plugin', array( Onboarding_Controller::class, 'plugin_view' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}/status', array( Onboarding_Controller::class, 'status' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}/google', array( Onboarding_Controller::class, 'google_view' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/advance/{step}', array( Onboarding_Controller::class, 'advance' ), $admin );
+	$r->add( 'GET', '/onboarding/{id}/summary', array( Onboarding_Controller::class, 'summary_view' ), $admin );
+	$r->add( 'POST', '/onboarding/{id}/finish', array( Onboarding_Controller::class, 'finish' ), $admin );
+	$r->add( 'POST', '/businesses/{id}/perception/external', array( Onboarding_Controller::class, 'reanalyze' ), $admin );
+	$r->add( 'GET', '/businesses/{id}/perception', array( Perception_Controller::class, 'index' ) );
+	$r->add( 'POST', '/businesses/{id}/perception/internal/{site_id}', array( Perception_Controller::class, 'internal' ) );
 
 	// Business sub-resources (Stage 2). Authorization: Business_Scoped_Controller::business().
 	foreach ( array( 'contacts', 'offerings', 'rules' ) as $collection ) {
@@ -196,4 +230,16 @@ return static function ( Router $r ): void {
 	$r->add( 'POST', '/settings/{section}', array( Settings_Controller::class, 'update' ), $admin );
 	$r->add( 'POST', '/settings/credentials/{provider}', array( Settings_Controller::class, 'save_credential' ), $admin );
 	$r->add( 'POST', '/jobs/run-batch', array( Cron_Controller::class, 'run_batch' ), $admin );
+	$r->add( 'POST', '/settings/test/{provider}', array( Settings_Controller::class, 'test_connection' ), $admin );
+
+	// Backup to Google Drive (super admin).
+	$r->add( 'GET', '/backup', array( Backup_Controller::class, 'index' ), $admin );
+	$r->add( 'GET', '/backup/status', array( Backup_Controller::class, 'status' ), $admin );
+	$r->add( 'POST', '/backup/settings', array( Backup_Controller::class, 'save' ), $admin );
+	$r->add( 'POST', '/backup/drive/connect', array( Google_Controller::class, 'connect_drive' ), $admin );
+	$r->add( 'POST', '/backup/drive/disconnect', array( Backup_Controller::class, 'disconnect' ), $admin );
+	$r->add( 'POST', '/backup/drive/folder', array( Backup_Controller::class, 'folder' ), $admin );
+	$r->add( 'POST', '/backup/run', array( Backup_Controller::class, 'run' ), $admin );
+	$r->add( 'POST', '/backup/download', array( Backup_Controller::class, 'download' ), $admin );
+	$r->add( 'POST', '/backup/{id}/delete', array( Backup_Controller::class, 'destroy' ), $admin );
 };

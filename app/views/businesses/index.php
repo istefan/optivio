@@ -30,7 +30,8 @@ $ov_badges   = array(
 		<?php endforeach; ?>
 	</div>
 	<?php if ( ! empty( $view['is_super_admin'] ) ) : ?>
-		<a class="btn btn-dark ms-auto" href="<?php echo esc_url( ov_url( '/businesses/new' ) ); ?>"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Afacere nouă</a>
+		<a class="btn btn-light ms-auto" href="<?php echo esc_url( ov_url( '/businesses/new' ) ); ?>">Completare manuală</a>
+		<a class="btn btn-dark" href="<?php echo esc_url( ov_url( '/onboarding' ) ); ?>"><i class="bi bi-magic me-1" aria-hidden="true"></i>Afacere nouă (wizard)</a>
 	<?php endif; ?>
 </div>
 
@@ -74,7 +75,12 @@ $ov_badges   = array(
 								</div>
 							</td>
 							<td><span class="ov-badge <?php echo esc_attr( $ov_badge[0] ); ?>"><?php echo esc_html( $ov_badge[1] ); ?></span></td>
-							<td class="text-end"><a class="btn btn-sm btn-light" href="<?php echo esc_url( ov_url( '/businesses/' . (int) $ov_row['id'] ) ); ?>">Deschide</a></td>
+							<td class="text-end text-nowrap">
+								<a class="btn btn-sm btn-light" href="<?php echo esc_url( ov_url( '/businesses/' . (int) $ov_row['id'] ) ); ?>">Deschide</a>
+								<?php if ( ! empty( $view['is_super_admin'] ) ) : ?>
+									<a class="btn btn-sm btn-light" href="<?php echo esc_url( ov_url( '/businesses/' . (int) $ov_row['id'] . '/delete' ) ); ?>" title="Șterge definitiv" aria-label="Șterge definitiv <?php echo esc_attr( (string) $ov_row['name'] ); ?>"><i class="bi bi-trash" aria-hidden="true"></i></a>
+								<?php endif; ?>
+							</td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>

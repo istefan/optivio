@@ -6,7 +6,7 @@ Acest fișier descrie **cum se lucrează** în codul OptiVio. Citiți-l împreun
 
 ## 0. Obligații la fiecare modificare
 1. Actualizați `README.md`, `CLAUDE.md`, `RULES.md` dacă modificarea le afectează.
-2. Orice schimbare de structură DB ⇒ **rescrieți integral** `schema.sql` + incrementați versiunea din `INSERT INTO schema_migrations` + `OPTIVIO_SCHEMA_VERSION` din `app/bootstrap.php`.
+2. Orice schimbare de structură DB ⇒ **rescrieți integral** `schema.sql` + incrementați versiunea din `INSERT INTO schema_migrations` + `OPTIVIO_SCHEMA_VERSION` din `app/bootstrap.php` + adăugați `database/upgrades/<versiune>.sql` (se aplică automat la deploy prin `Core\Migrator`; doar SQL simplu, reluabil).
 3. Fișierele modificate se furnizează integral.
 4. Fiecare fișier PHP nou începe cu docblock-ul standard (vezi orice fișier existent, `@author` inclus).
 5. Rulați `php -l` pe fișierele atinse și, dacă e disponibil, `phpcs` (config `phpcs.xml.dist`).
@@ -19,7 +19,10 @@ Acest fișier descrie **cum se lucrează** în codul OptiVio. Citiți-l împreun
 - **Etapa 5 — implementată** (fără modificări de schemă): namespace `OptiVio\Google` în `app/google/` (`Google_Oauth`, `Google_Client`, `Google_Http`, `Google_Mock`, `Google_Discovery`, `Google_Sync`), `Google_Controller` (`/google`, `/google/connect`, `/oauth/google/callback`, `/google/accounts/{id}`, `/sites/{id}/integrations/{provider}/sync`, `/sites/{id}/google`), job `google.sync`, `Database::upsert_many()`.
 - **Etapa 6 — implementată** (schema 1.3.0): namespace `OptiVio\Engine` în `app/engine/` (`Text`, `Insight_Store`, `Seo_Auditor`, `Search_Insights`, `Keyword_Research`, `Ads_Strategy`, `Safe_Fetcher`, `Competitors`, `Engine_Runner`), `Strategy_Controller` (`/seo-audit`, `/keywords`, `/ads`, `/competitors`, `/competitors/compare`, `/engine/run`, `/insights/{id}/dismiss`), joburi `engine.run` (zilnic) și `competitors.scan` (săptămânal).
 - **Etapa 7 — implementată** (schema 1.4.0): namespace `OptiVio\Ai` în `app/ai/` (`Ai_Client`, `Ai_Pricing`, `Ai_Mock`, `Snapshot_Builder`, `Prompts`) și `OptiVio\Actions` în `app/actions/` (`Cards`, `Card_Generator`, `Analysis_Service`, `Card_Applier`); `Analyses_Controller` (`/analyses`, `/analyses/new`, `/analyses/{id}`), `Actions_Controller` (`/actions`, `/actions/{id}` + `apply|manual|reject|rollback|generate|images|images/{image_id}`, `/uploads/{id}`); plugin 1.1.0 (`update_post` acceptă `fields.append`).
-- Toate cele 7 etape din planul inițial sunt implementate; `schema.sql` = versiunea 1.4.0.
+- Toate cele 7 etape din planul inițial sunt implementate.
+- **Etapa 8 — Onboarding & percepție** (schema 1.5.0): namespace `OptiVio\Onboarding` în `app/onboarding/` (`Page_Discovery`, `Page_Extractor`, `Drafts`, `Perception`, `Perception_Gaps`); `Onboarding_Controller` (`/onboarding`, `/onboarding/{id}/pages|fetch|analyze|confirm|commercial|plugin|status|google|advance/{step}|summary|finish|delete`, `/businesses/{id}/perception/external`), `Perception_Controller` (`/businesses/{id}/perception`, `/businesses/{id}/perception/internal/{site_id}`), tab „Percepție”, job `onboarding.fetch`, profil AI `perception`; ștergere definitivă `Services\Business_Deleter` (`/businesses/{id}/delete`).
+- **Etapa 9 — Operare fără efort** (schema 1.6.0): `Core\Migrator` (upgrade-uri automate la primul request), `Services\Web_Cron` + `/cron/spawn` și `/cron/tick` (cron fără cPanel; `/cron/run` și `cron_token` au fost eliminate), `Services\Connection_Tester` + `POST /settings/test/{provider}` și `ov_test_button()`, backup `Services\Backup_Service` + `Backup_Drive` + `Core\Zip_Stream`, `Backup_Controller` (`/backup…`), job `backup.run`, tabel `backups`.
+- `schema.sql` = versiunea 1.6.0.
 - **Ajutor & ghiduri** (fără modificări de schemă): `Help_Controller` (`/help`, `app/views/help/index.php`), catalogul ghidurilor de integrare `Services\Integration_Guides` (cheie → titlu, iconiță, rezumat, linkuri, pași, note; `{redirect_uri}` se înlocuiește automat). În view-uri: `ov_guide_button( 'cheie', 'Etichetă' )` afișează butonul, iar layout-ul tipărește o singură dată modalele folosite (`partials/guide-modals`, corpul în `partials/guide-body`). Integrare nouă ⇒ adăugați ghidul în `Integration_Guides::all()`; pas nou în flux ⇒ actualizați `/help`.
 
 ## 2. Hartă cod
@@ -34,6 +37,11 @@ Acest fișier descrie **cum se lucrează** în codul OptiVio. Citiți-l împreun
 | Sesiune / CSRF | `class-session.php`, `class-csrf.php` | Flash, old input, token, Origin check |
 | View | `app/core/class-view.php` | `render( $tpl, $data, $layout )`, `partial()`; template-urile primesc `$view` |
 | Joburi | `app/core/class-job-queue.php`, `app/services/class-job-handlers.php`, `class-cron-runner.php` | Coadă MySQL, handler-e, rulare cu lock `GET_LOCK` |
+| Cron web | `app/services/class-web-cron.php`, `class-cron-controller.php` | `register()` la fiecare request → `on_shutdown()` → `claim()` atomic pe `cron.web_last_spawn` → `spawn()` loopback `/cron/spawn` (header `X-OptiVio-Cron`, secret `cron.web_token` auto-generat); rezerve `fastcgi_finish_request` / `/cron/tick` |
+| Migrări | `app/core/class-migrator.php` | `ensure()` (marker `storage/cache/schema-<v>.ok`), `pending()`, `statements()`, instalare `schema.sql` pe bază goală |
+| Onboarding | `app/onboarding/` | `Page_Discovery` (robots, sitemap, meniu, clasificare, preselecție), `Page_Extractor` (text pe linii + fapte), `Drafts` (ciorne, pagini, `process()` cu claim atomic), `Perception` (buget text, prompt, `validate()`, imuabil), `Perception_Gaps` (diferențe, scor claritate, carduri `gap:*`) |
+| Backup | `app/services/class-backup-service.php`, `class-backup-drive.php`, `app/core/class-zip-stream.php` | Export SQL gzip PHP pur, ZIP streaming, programare `last_slot/next_slot`, rotație `keep`; Drive `drive.file`, upload resumable 8 MB |
+| Teste conexiune | `app/services/class-connection-tester.php` | `test( $provider )` → `{ok, message, ms}`; provider nou ⇒ `PROVIDERS` + metodă |
 | Auth | `app/security/class-auth.php` | Login, validare sesiune (idle/absolut/UA/session_version) |
 | RBAC | `app/security/class-gate.php` | `is_super_admin()`, `accessible_business_ids()`, `authorize_business()`, `authorize_site()`, `scope_business_ids()` |
 | Rate limit | `app/security/class-rate-limiter.php` | `blocked_for()`, `hit()`, `clear()` |
@@ -47,7 +55,7 @@ Acest fișier descrie **cum se lucrează** în codul OptiVio. Citiți-l împreun
 | Action Cards | `app/actions/` | `Cards` (categorii, validare strictă payload, creare deduplicată prin `card_hash`), `Card_Generator` (carduri deterministe din insight-uri + audit, în `Engine_Runner`), `Analysis_Service` (analiză profundă, completare card), `Card_Applier` (aplicare prin `Remote_Operations`, manual, respingere → regulă, rollback) |
 | Controllere | `app/controllers/` | Extind `Controller` (`render()`, `redirect_with()`, `back_with_errors()`, `text()`, `textarea()`); paginile de sub `/businesses/{id}/…` extind `Business_Scoped_Controller` (`business( 'view' / 'manage' )`, `render_tab()`, `decimal()`, `checkbox()`) |
 | UI | `app/views/`, `public/assets/css/optivio.css`, `public/assets/js/optivio.js` | Bootstrap 5.3 local + design monocrom |
-| CLI | `bin/` | `generate-key.php`, `install.php`, `cron.php`, `seed-demo.php`, `dev-router.php` |
+| CLI | `bin/` | `generate-key.php` (master_key + install_token), `install.php`, `cron.php` (doar dezvoltare), `seed-demo.php`, `dev-router.php`; `cli-bootstrap.php` rulează și `Migrator::ensure()` |
 
 ## 3. Convenții de nume (WPCS)
 - Namespace `OptiVio\<Zona>` ↔ director `app/<zona>/`; clasa `Rate_Limiter` ↔ fișier `class-rate-limiter.php`.
@@ -89,7 +97,7 @@ Pentru listări: transmiteți `Gate::accessible_business_ids()` (null = toate) s
 ### 4.4 Job de fundal
 1. Handler static în `Job_Handlers::map()` — semnătură `( array $job, Job_Queue $queue )`; returnează `null` (gata) sau un array `cursor_state` (mai sunt batch-uri; include `progress` 0–99).
 2. Programare: `Job_Queue::dispatch( 'tip', $payload, array( 'unique' => '...', 'business_id' => ... ) )`.
-3. Recurent: adăugați în `Job_Handlers::schedule_recurring()` cu `unique` pe interval.
+3. Recurent: adăugați în `Job_Handlers::schedule_recurring()` cu `unique` pe interval. Coada este pornită de cron-ul web (fără cPanel); pentru a porni imediat un job lansat de utilizator: `register_shutdown_function( array( Web_Cron::class, 'spawn' ) )`.
 4. **Interzis**: apeluri AI în handler-e (RULES R5).
 
 ### 4.5 AJAX
@@ -106,13 +114,16 @@ Pentru listări: transmiteți `Gate::accessible_business_ids()` (null = toate) s
 - Google: `gsc_daily`, `ga4_daily`, `psi_audits`, `gtm_snapshots`, `ads_campaigns`, `ads_keywords`, `ads_hourly`, `ads_search_terms`, `adsense_daily`, `gbp_daily`.
 - Strategie: `keywords`, `keyword_insights`, `serp_queries`, `competitors`, `competitor_pages`.
 - AI & execuție: `ai_requests`, `analyses`, `action_cards`, `action_card_images`, `uploads`, `remote_operations`.
-- Infrastructură: `jobs`, `cron_runs`, `schema_migrations`.
+- Onboarding & percepție: `onboarding_drafts`, `onboarding_pages`, `business_perceptions` (imuabil, `is_baseline`), `perception_gaps`; `businesses.onboarding_state` (pas, amânări, decizii).
+- Infrastructură: `jobs`, `cron_runs` (`trigger_source` web/ajax/cli), `schema_migrations`, `backups`.
 
 ## 6. Dezvoltare locală
 - Server PHP integrat: `php -S 127.0.0.1:8090 -t public bin/dev-router.php` (config: `app_url = http://127.0.0.1:8090`). Configurația este și în `.claude/launch.json` (`optivio`).
 - Laragon (configurația activă): după „Reload" Apache se creează vhost-ul `optivio.test` (cu `AllowOverride All`); setați `app_url = http://optivio.test`. `http://localhost/optivio` NU funcționează local deoarece vhost-ul implicit are `AllowOverride None`.
 - Conturi de test: `storage/dev-credentials.txt` (neversionat). Date demo: `php bin/seed-demo.php` / `--purge`.
 - Sesiunea este legată de User-Agent: schimbarea UA (ex. emulare mobil în browser) deconectează utilizatorul — comportament intenționat.
+- Cron-ul web funcționează și local (loopback la `app_url`); `php bin/cron.php` procesează coada manual. Onboarding-ul poate citi site-ul WordPress de test (`127.0.0.1:8091`) doar în `development` (`Safe_Fetcher` opțiunea `allow_local`).
+- Testarea migrărilor: o bază cu schema veche + `Migrator::ensure()` (vezi `database/upgrades`); markerul `storage/cache/schema-<versiune>.ok` se șterge pentru a forța verificarea.
 
 ## 6b. Contract API conector (v1)
 - Autentificare: headere `X-OptiVio-Key`, `X-OptiVio-Timestamp` (unix), `X-OptiVio-Nonce` (32 hex), `X-OptiVio-Signature` = HMAC-SHA256(secret, `METHOD\nPATH\nTIMESTAMP\nNONCE\nsha256(body)`). `PATH` = calea relativă la `app_url` (ex. `/api/connector/v1/events`).
@@ -170,3 +181,19 @@ Normalizează textul (fără diacritice), caută „piloni" prin regex (non-stop
 - **Card nou determinist**: adăugați regula în `Card_Generator` cu o cheie stabilă `hash_key` (deduplicare `UNIQUE(business_id, card_hash)`). **Categorie nouă**: `Cards::CATEGORIES` + ramura din `Cards::payload()` + `Card_Applier` (dacă e remote) + formularul din `app/views/actions/show.php` + `Prompts::CARD_CONTRACT` + `Ai_Mock`.
 - **Imagini**: slot `action_card_images` (prompt + ALT) → upload `uploads` (`storage/uploads/`, servit prin `/uploads/{id}`) → la aplicare `upload_media`; markerul `{{image:…}}` lipsă ⇒ imaginea inline se adaugă la final.
 - **Testare locală**: `'ai_mock' => true` (doar `development`); pentru purpose nou adăugați răspunsul în `Ai_Mock`.
+
+## 9. Onboarding & percepție (Etapa 8)
+- **Flux**: ciornă (`onboarding_drafts`, fără afacere) → pagini (`onboarding_pages`, max. `onboarding.max_pages_per_site` / `_per_run`) → `Drafts::process()` (job `onboarding.fetch` + AJAX `POST /onboarding/{id}/fetch`) → `Perception::run()` (AI, profil `perception`, doar POST explicit) → confirmare (afacerea se creează în tranzacție, percepția devine `is_baseline`, `ai_requests.business_id` se leagă) → `Perception_Gaps::compute()` + `cards()`.
+- **Decizii** în `businesses.onboarding_state.decisions`: `fields` (verdict `ok|corrected|na` pentru business_model, summary, target_audience), `rejected_services`, `rejected_areas`, `pillars` (cheile `Usp_Builder::PILLARS` confirmate). Re-analizele (externe sau interne) folosesc aceleași decizii.
+- **Tipuri de diferență**: `confirmed`, `corrected`, `missing_on_site`, `hallucinated`, `unclear`, `not_applicable`; scor de claritate ponderat (`Perception_Gaps::WEIGHTS`).
+- **Diferență / card nou**: adăugați câmpul în `Perception_Gaps::FIELDS`, calculul în `compute()` (cu `item_key = Text::key()`), cardul în `card_for()` (`hash_key gap:{field}:{item_key}`), eticheta în Ajutor.
+- **Percepție din interior**: `Perception::pages_from_site()` (din `wp_content` + `wp_content_bodies` + `wp_seo_meta`), disponibilă doar dacă site-ul are `connector_status = connected` și conținut sincronizat.
+- **Mock**: `Ai_Mock::perception()` derivă răspunsul din textul paginilor (pentru purpose `perception_*`).
+
+## 10. Operare: cron web, migrări, backup, teste de conexiune
+- **Cron web**: nu adăugați instrucțiuni de tip „configurați un cron în cPanel”. Intervalul (`cron.interval_minutes`, 1–15) și bugetul (`cron.batch_seconds`) sunt setări. Starea loopback-ului: `cron.web_loopback`.
+- **Upgrade nou**: `database/upgrades/X.Y.Z.sql` doar cu instrucțiuni separate prin `;`, fără `DELIMITER`; erorile 1050/1060/1061/1062/1022/1091/1826 sunt tolerate (reluare sigură). La final inserați versiunea în `schema_migrations` (migratorul o inserează oricum cu `INSERT IGNORE`).
+- **Setare nouă**: valoare implicită în `Settings_Repository::DEFAULTS` (niciodată cheie nouă obligatorie în `config.php`); secret nou → `SECRET_KEYS` + generare automată la prima utilizare.
+- **Backup**: setări `backup.*` (enabled, include_db, include_files, files_mode, frequency, hour, keep ∈ {1,2,3,5,10,15,21,30}, keep_local, folder_name, drive_folder_id, last_slot); tokenurile Drive în secretul `backup.drive_tokens`. Conectarea Drive folosește `Google_Controller::start_oauth( 'drive' )` (scope `drive.file`, același redirect URI, `state.purpose = drive`). Mock: `Google_Mock` răspunde la `/drive/v3/files…`, iar `Backup_Drive::upload()` întoarce un ID `mock-…`.
+- **Test de conexiune nou**: `Connection_Tester::PROVIDERS` + metoda (cel mai ieftin apel, mesaj fără secrete) + `ov_test_button( 'cheie' )` în view.
+

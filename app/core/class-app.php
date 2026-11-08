@@ -44,8 +44,19 @@ final class App {
 			}
 		}
 
+		// New code deployed? Apply the pending database upgrades automatically (no script to run).
 		try {
-			// Machine endpoints (plugin API, HTTP cron) are stateless: no session file, no cookie.
+			Migrator::ensure();
+		} catch ( Throwable $e ) {
+			Logger::error( 'Automatic migration failed', array( 'exception' => $e ) );
+			Response::text( 'OptiVio își actualizează baza de date. ' . ( Config::is_dev() ? $e->getMessage() : 'Reîncercați în câteva momente; dacă problema persistă, verificați storage/logs.' ), 503 );
+		}
+
+		// Web cron (no cPanel): after the response, a due tick spawns the job queue in the background.
+		\OptiVio\Services\Web_Cron::register( $request->path() );
+
+		try {
+			// Machine endpoints (plugin API, web cron) are stateless: no session file, no cookie.
 			if ( ! self::is_machine_path( $request->path() ) ) {
 				Session::start( $request->is_https() );
 			}
@@ -74,7 +85,7 @@ final class App {
 	 * @return bool
 	 */
 	public static function is_machine_path( string $path ): bool {
-		return 0 === strpos( $path, '/api/connector/' ) || '/cron/run' === $path;
+		return 0 === strpos( $path, '/api/connector/' ) || '/cron/spawn' === $path;
 	}
 
 	/**
