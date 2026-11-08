@@ -92,11 +92,17 @@ final class Google_Mock {
 		if ( str_ends_with( $path, '/runPagespeed' ) ) {
 			return array( 200, self::psi() );
 		}
+		if ( str_ends_with( $path, '/dataStreams' ) ) {
+			return array( 200, array( 'dataStreams' => array( array( 'type' => 'WEB_DATA_STREAM', 'webStreamData' => array( 'defaultUri' => 'https://www.instalatori-non-stop.ro' ) ) ) ) );
+		}
+		if ( str_ends_with( $path, '/sites' ) && 'adsense.googleapis.com' === $host ) {
+			return array( 200, array( 'sites' => array( array( 'domain' => 'instalatori-non-stop.ro' ) ) ) );
+		}
 		if ( str_ends_with( $path, '/tagmanager/v2/accounts' ) ) {
 			return array( 200, array( 'account' => array( array( 'path' => 'accounts/600', 'name' => 'Agenție' ) ) ) );
 		}
 		if ( str_ends_with( $path, '/containers' ) ) {
-			return array( 200, array( 'container' => array( array( 'path' => 'accounts/600/containers/700', 'publicId' => 'GTM-ABC1234', 'name' => 'instalatori-non-stop.ro' ) ) ) );
+			return array( 200, array( 'container' => array( array( 'path' => 'accounts/600/containers/700', 'publicId' => 'GTM-ABC1234', 'name' => 'instalatori-non-stop.ro', 'domainName' => array( 'instalatori-non-stop.ro' ) ) ) ) );
 		}
 		if ( str_ends_with( $path, '/versions:live' ) ) {
 			return array( 200, array( 'containerVersionId' => '42', 'tag' => array( array( 'type' => 'googtag' ), array( 'type' => 'gaawc' ), array( 'type' => 'awct' ), array( 'type' => 'html' ) ), 'trigger' => array( array(), array() ), 'variable' => array( array() ) ) );

@@ -96,7 +96,7 @@ $ov_steps = static function ( array $steps ): void {
 					'**Confirmă profilul**: formularul vine precompletat. Sub fiecare câmp vedeți „AI a înțeles: …” cu încrederea, sursa și citatul. Alegeți **Corect / Corectez / Nu se aplică**, debifați serviciile deduse greșit, adăugați serviciile reale pe care AI nu le-a găsit și bifați punctele forte reale. La salvare se creează afacerea, site-urile (cu cheia pentru plugin) și serviciile, iar diferențele devin recomandări.',
 					'**USP și reguli**: USP-ul calculat din punctele forte confirmate, regulile permanente, valoarea medie a unei lucrări, capacitatea zilnică și persoana de contact.',
 					'**Plugin**: pentru fiecare site WordPress, descărcați pluginul (cheia e inclusă) și instalați-l. Starea se actualizează singură: „Aștept heartbeat” → „Conectat” → pagini sincronizate. Se poate amâna.',
-					'**Google**: starea integrărilor fiecărui site și linkul spre configurare. Se poate amâna.',
+					'**Google** (ca în Site Kit): **Conectează-te cu Google** cu contul agenției (o singură dată). OptiVio listează proprietățile accesibile și le potrivește cu domeniul fiecărui site (Search Console, fluxul web GA4, containerul Tag Manager, fișa Business Profile, site-ul AdSense). Apăsați **Conectează** pe fiecare serviciu sau **Conectează tot ce am găsit**; „Altă proprietate” permite alegerea manuală. Google Ads nu are domeniu: contul sugerat se conectează doar manual. Prima sincronizare pornește imediat. Se poate amâna.',
 					'**Rezumat**: scorul de pregătire, scorul de claritate, diferențele percepție vs realitate și cardurile create. **Finalizează** rulează o dată motorul determinist.',
 				)
 			);

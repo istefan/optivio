@@ -109,6 +109,7 @@ final class Google_Controller extends Controller {
 				'verifier' => $pkce['verifier'],
 				'expires'  => time() + 600,
 				'purpose'  => 'drive' === $purpose ? 'drive' : 'accounts',
+				'return'   => self::safe_return( (string) $this->request->input( 'return', '' ) ),
 			)
 		);
 
@@ -161,7 +162,8 @@ final class Google_Controller extends Controller {
 		} catch ( Throwable $e ) {
 			Session::flash( 'warning', 'Contul a fost conectat, dar listarea proprietăților a eșuat: ' . $e->getMessage() );
 		}
-		$this->redirect_with( '/google/accounts/' . $id, 'success', 'Contul Google ' . $result['email'] . ' a fost conectat.' );
+		$back = '' !== (string) ( $pending['return'] ?? '' ) ? (string) $pending['return'] : '/google/accounts/' . $id;
+		$this->redirect_with( $back, 'success', 'Contul Google ' . $result['email'] . ' a fost conectat; proprietățile accesibile au fost listate.' );
 	}
 
 	/**
@@ -294,5 +296,15 @@ final class Google_Controller extends Controller {
 			throw Http_Exception::not_found();
 		}
 		return $row;
+	}
+
+	/**
+	 * Local return path after the OAuth callback (wizard / site pages only).
+	 *
+	 * @param string $path Requested path.
+	 * @return string
+	 */
+	private static function safe_return( string $path ): string {
+		return preg_match( '#^/(onboarding|sites)/[0-9]{1,10}(/[a-z]{1,20})?$#', $path ) ? $path : '';
 	}
 }

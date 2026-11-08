@@ -190,6 +190,7 @@ Normalizează textul (fără diacritice), caută „piloni" prin regex (non-stop
 - **Diferență / card nou**: adăugați câmpul în `Perception_Gaps::FIELDS`, calculul în `compute()` (cu `item_key = Text::key()`), cardul în `card_for()` (`hash_key gap:{field}:{item_key}`), eticheta în Ajutor.
 - **Percepție din interior**: `Perception::pages_from_site()` (din `wp_content` + `wp_content_bodies` + `wp_seo_meta`), disponibilă doar dacă site-ul are `connector_status = connected` și conținut sincronizat.
 - **Mock**: `Ai_Mock::perception()` derivă răspunsul din textul paginilor (pentru purpose `perception_*`).
+- **Pasul Google (Site Kit)**: `Google\Google_Discovery` salvează pentru fiecare proprietate și `uris` (fluxuri web GA4, `domainName` GTM, site-uri AdSense, `websiteUri` GBP); `Google\Google_Matcher::suggest()` dă scorul (GSC domeniu 100 / URL 95 / domeniu părinte 80, URI 90, nume 60/40; Ads singurul cont 30, niciodată automat; conectare automată ≥ `AUTO_SCORE` 60). Rute: `/onboarding/{id}/google/discover`, `/google/{site_id}/auto`, `/google/{site_id}/{provider}` (valoare `credential_id|property_id`, verificată cu `Google_Matcher::find()`). `/google/connect` acceptă `return` (doar `/onboarding/{id}/…` sau `/sites/{id}/…`).
 
 ## 10. Operare: cron web, migrări, backup, teste de conexiune
 - **Cron web**: nu adăugați instrucțiuni de tip „configurați un cron în cPanel”. Intervalul (`cron.interval_minutes`, 1–15) și bugetul (`cron.batch_seconds`) sunt setări. Starea loopback-ului: `cron.web_loopback`.

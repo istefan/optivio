@@ -24,6 +24,7 @@ use OptiVio\Core\Http_Exception;
 use OptiVio\Core\Response;
 use OptiVio\Core\Validator;
 use OptiVio\Engine\Engine_Runner;
+use OptiVio\Google\Google_Matcher;
 use OptiVio\Onboarding\Drafts;
 use OptiVio\Onboarding\Page_Discovery;
 use OptiVio\Onboarding\Perception;
@@ -654,19 +655,152 @@ final class Onboarding_Controller extends Controller {
 	 */
 	public function google_view(): void {
 		[ $draft, $business ] = $this->with_business();
+		$candidates           = Google_Matcher::candidates();
 		$sites                = array();
 		foreach ( $this->site_status( (int) $business['id'] ) as $site ) {
 			$site['integrations'] = Sites_Repository::integrations( (int) $site['id'] );
-			$sites[]              = $site;
+			$site['suggestions']  = Google_Matcher::suggest( (string) $site['url'], $candidates );
+			$site['auto']         = 0;
+			foreach ( $site['suggestions'] as $provider => $s ) {
+				if ( null !== $s['match'] && $s['score'] >= Google_Matcher::AUTO_SCORE && '' === (string) ( $site['integrations'][ $provider ]['external_id'] ?? '' ) ) {
+					++$site['auto'];
+				}
+			}
+			$sites[] = $site;
 		}
 		$this->render(
 			'onboarding/google',
 			$this->base( $draft, 'google', $business ) + array(
-				'sites'     => $sites,
-				'providers' => Sites_Repository::PROVIDERS,
-				'accounts'  => \OptiVio\Google\Google_Client::accounts(),
+				'sites'      => $sites,
+				'providers'  => Sites_Repository::PROVIDERS,
+				'accounts'   => \OptiVio\Google\Google_Client::accounts(),
+				'candidates' => $candidates,
+				'discovered' => Google_Matcher::has_discovery(),
 			)
 		);
+	}
+
+	/**
+	 * Re-lists the properties of every connected Google account.
+	 *
+	 * @return void
+	 */
+	public function google_discover(): void {
+		[ $draft ] = $this->with_business();
+		$errors    = array();
+		foreach ( \OptiVio\Google\Google_Client::accounts() as $account ) {
+			try {
+				$result = \OptiVio\Google\Google_Discovery::run( (int) $account['id'] );
+				foreach ( $result['errors'] as $provider => $message ) {
+					$errors[] = $account['account_email'] . ' / ' . ( Sites_Repository::PROVIDERS[ $provider ][0] ?? $provider ) . ': ' . $message;
+				}
+			} catch ( \Throwable $e ) {
+				$errors[] = $account['account_email'] . ': ' . $e->getMessage();
+			}
+		}
+		$back = '/onboarding/' . (int) $draft['id'] . '/google';
+		if ( ! empty( $errors ) ) {
+			$this->redirect_with( $back, 'warning', 'Proprietăți actualizate, cu erori: ' . mb_substr( implode( ' · ', $errors ), 0, 600 ) );
+		}
+		$this->redirect_with( $back, 'success', 'Lista proprietăților Google a fost actualizată.' );
+	}
+
+	/**
+	 * Connects (or disconnects) one Google service of a site — Site Kit style.
+	 *
+	 * @return void
+	 */
+	public function google_connect(): void {
+		[ $draft, $business ] = $this->with_business();
+		$site                 = $this->business_site( (int) $business['id'] );
+		$provider             = $this->request->param_key( 'provider' );
+		$back                 = '/onboarding/' . (int) $draft['id'] . '/google';
+		if ( ! in_array( $provider, Google_Matcher::PROVIDERS, true ) ) {
+			throw new Http_Exception( 404 );
+		}
+		$value = (string) $this->request->input( 'property', '' );
+		if ( '' === $value ) {
+			Sites_Repository::save_integration( (int) $site['id'], $provider, null, 'not_configured' );
+			Audit_Log::record( 'site.integration_update', 'site', (int) $site['id'], array( 'provider' => $provider, 'status' => 'not_configured', 'via' => 'onboarding' ), (int) $business['id'] );
+			$this->redirect_with( $back, 'success', Sites_Repository::PROVIDERS[ $provider ][0] . ' a fost deconectat pentru ' . $site['name'] . '.' );
+		}
+		[ $credential_id, $property ] = array_pad( explode( '|', $value, 2 ), 2, '' );
+		$candidate                    = Google_Matcher::find( $provider, absint( $credential_id ), (string) $property );
+		if ( null === $candidate ) {
+			$this->redirect_with( $back, 'error', 'Proprietatea aleasă nu este accesibilă contului Google. Reîmprospătați lista.' );
+		}
+		$this->connect_integration( $site, (int) $business['id'], $provider, $candidate );
+		$this->redirect_with( $back, 'success', Sites_Repository::PROVIDERS[ $provider ][0] . ' conectat pentru ' . $site['name'] . ': ' . $candidate['label'] . '. Prima sincronizare a pornit.' );
+	}
+
+	/**
+	 * Connects every confidently matched service of a site in one click.
+	 *
+	 * @return void
+	 */
+	public function google_auto(): void {
+		[ $draft, $business ] = $this->with_business();
+		$site                 = $this->business_site( (int) $business['id'] );
+		$current              = Sites_Repository::integrations( (int) $site['id'] );
+		$done                 = array();
+		foreach ( Google_Matcher::suggest( (string) $site['url'], Google_Matcher::candidates() ) as $provider => $s ) {
+			if ( null === $s['match'] || $s['score'] < Google_Matcher::AUTO_SCORE || '' !== (string) ( $current[ $provider ]['external_id'] ?? '' ) ) {
+				continue;
+			}
+			$this->connect_integration( $site, (int) $business['id'], $provider, $s['match'] );
+			$done[] = Sites_Repository::PROVIDERS[ $provider ][0];
+		}
+		$this->redirect_with(
+			'/onboarding/' . (int) $draft['id'] . '/google',
+			empty( $done ) ? 'warning' : 'success',
+			empty( $done ) ? 'Nu am găsit servicii de conectat automat pentru ' . $site['name'] . '.' : 'Conectat pentru ' . $site['name'] . ': ' . implode( ', ', $done ) . '. Prima sincronizare a pornit.'
+		);
+	}
+
+	/**
+	 * Saves the integration (account + property) and starts its first sync.
+	 *
+	 * @param array  $site        Site.
+	 * @param int    $business_id Business.
+	 * @param string $provider    Provider.
+	 * @param array  $candidate   Candidate (credential_id, id, label).
+	 * @return void
+	 */
+	private function connect_integration( array $site, int $business_id, string $provider, array $candidate ): void {
+		$site_id = (int) $site['id'];
+		Sites_Repository::save_integration( $site_id, $provider, (string) $candidate['id'], 'active' );
+		Database::instance()->query(
+			'UPDATE site_integrations SET credential_id = ?, settings = NULL WHERE site_id = ? AND provider = ?',
+			array( (int) $candidate['credential_id'], $site_id, $provider )
+		);
+		\OptiVio\Google\Google_Sync::dispatch( $site_id, $provider, $business_id, 'connect-' . gmdate( 'YmdHis' ), (int) $this->user()['id'] );
+		Audit_Log::record(
+			'site.integration_update',
+			'site',
+			$site_id,
+			array(
+				'provider' => $provider,
+				'status'   => 'active',
+				'via'      => 'onboarding',
+			),
+			$business_id
+		);
+		register_shutdown_function( array( \OptiVio\Services\Web_Cron::class, 'spawn' ) );
+	}
+
+	/**
+	 * Site of the route that belongs to the business.
+	 *
+	 * @param int $business_id Business.
+	 * @return array
+	 * @throws Http_Exception 404.
+	 */
+	private function business_site( int $business_id ): array {
+		$site = Sites_Repository::find( $this->request->param_int( 'site_id' ) );
+		if ( null === $site || (int) $site['business_id'] !== $business_id ) {
+			throw new Http_Exception( 404 );
+		}
+		return $site;
 	}
 
 	/**
