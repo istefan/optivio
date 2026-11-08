@@ -1,0 +1,32 @@
+# OptiVio — front controller and hardening.
+# @author Stefan Iftimie, founder Ahoi Digital SRL <https://www.ahoi.ro/>
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+	RewriteEngine On
+	RewriteCond %{REQUEST_FILENAME} !-f
+	RewriteRule ^ index.php [L,QSA]
+</IfModule>
+
+# Only index.php may be executed.
+<FilesMatch "\.(php|phtml|phar)$">
+	Require all denied
+</FilesMatch>
+<Files "index.php">
+	Require all granted
+</Files>
+
+<IfModule mod_headers.c>
+	Header always set X-Content-Type-Options "nosniff"
+	Header always set X-Frame-Options "DENY"
+	Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+<IfModule mod_expires.c>
+	ExpiresActive On
+	ExpiresByType text/css "access plus 30 days"
+	ExpiresByType application/javascript "access plus 30 days"
+	ExpiresByType font/woff2 "access plus 1 year"
+	ExpiresByType image/svg+xml "access plus 30 days"
+</IfModule>

@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<!--
+	OptiVio — WordPress Coding Standards configuration.
+	@author Stefan Iftimie, founder Ahoi Digital SRL <https://www.ahoi.ro/>
+
+	Install: composer global require wp-coding-standards/wpcs dealerdirect/phpcodesniffer-composer-installer
+	Run:     phpcs
+-->
+<ruleset name="OptiVio">
+	<description>WordPress Coding Standards for OptiVio (plain PHP application).</description>
+
+	<file>app</file>
+	<file>bin</file>
+	<file>public/index.php</file>
+	<file>plugin</file>
+
+	<exclude-pattern>public/assets/vendor/*</exclude-pattern>
+	<exclude-pattern>storage/*</exclude-pattern>
+
+	<arg name="extensions" value="php"/>
+	<arg value="sp"/>
+	<arg name="colors"/>
+
+	<config name="testVersion" value="8.2-"/>
+	<config name="minimum_wp_version" value="6.4"/>
+
+	<rule ref="WordPress">
+		<!-- Not a WordPress runtime: WP-specific API suggestions do not apply to the application. -->
+		<exclude name="WordPress.WP.I18n"/>
+		<exclude name="WordPress.WP.AlternativeFunctions"/>
+		<exclude name="WordPress.DB.RestrictedClasses"/>
+		<exclude name="WordPress.DB.RestrictedFunctions"/>
+		<exclude name="WordPress.WP.GlobalVariablesOverride"/>
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals"/>
+		<exclude name="WordPress.Security.NonceVerification"/>
+		<exclude name="Universal.Operators.DisallowShortTernary"/>
+	</rule>
+
+	<!-- Application escaping helpers recognised as safe. -->
+	<rule ref="WordPress.Security.EscapeOutput">
+		<properties>
+			<property name="customAutoEscapedFunctions" type="array">
+				<element value="ov_csrf_field"/>
+				<element value="ov_json_for_html"/>
+			</property>
+		</properties>
+	</rule>
+
+	<rule ref="WordPress.Files.FileName">
+		<properties>
+			<property name="strict_class_file_names" value="true"/>
+		</properties>
+		<exclude-pattern>app/routes.php</exclude-pattern>
+		<exclude-pattern>app/views/*</exclude-pattern>
+		<exclude-pattern>bin/*</exclude-pattern>
+	</rule>
+</ruleset>

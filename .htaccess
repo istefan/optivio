@@ -1,0 +1,14 @@
+# OptiVio — root fallback when the document root cannot point to /public.
+# @author Stefan Iftimie, founder Ahoi Digital SRL <https://www.ahoi.ro/>
+Options -Indexes
+<IfModule mod_rewrite.c>
+	RewriteEngine On
+	# Block direct access to everything outside public/.
+	RewriteRule ^(app|bin|config|storage|plugin|database)(/|$) - [F,L]
+	RewriteRule ^(schema\.sql|README\.md|CLAUDE\.md|RULES\.md|phpcs\.xml\.dist|\.git.*)$ - [F,L]
+	RewriteCond %{REQUEST_URI} !/public/
+	RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+<IfModule !mod_rewrite.c>
+	Require all denied
+</IfModule>

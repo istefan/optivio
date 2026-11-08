@@ -1,0 +1,11 @@
+/config/config.php
+/storage/logs/*
+/storage/sessions/*
+/storage/uploads/*
+/storage/cache/*
+!/storage/*/.gitkeep
+/vendor/
+.DS_Store
+Thumbs.db
+/storage/dev-credentials.txt
+*.log
